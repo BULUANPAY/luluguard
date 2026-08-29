@@ -28,6 +28,7 @@ interface BridgeResponse<T> {
 interface BridgePaths {
   bridgePath: string;
   sandboxScriptsPath: string;
+  defaultStateDir: string;
 }
 
 function locateBridge(): BridgePaths {
@@ -52,6 +53,7 @@ function locateBridge(): BridgePaths {
       "vlei-sandbox",
       "scripts",
     ),
+    defaultStateDir: path.join(packageRoot, ".vlei-json-signing"),
   };
 }
 
@@ -179,10 +181,11 @@ export class VleiJsonSigning {
   readonly rootSeedEnvName: string;
 
   constructor(options: VleiJsonSigningOptions = {}) {
-    this.stateDir = path.resolve(options.stateDir ?? ".vlei-json-signing");
+    this.stateDir = options.stateDir
+      ? path.resolve(options.stateDir)
+      : locateBridge().defaultStateDir;
     this.pythonExecutable = options.pythonExecutable ?? "python3";
     this.rootSeedEnvName = options.rootSeedEnvName ?? "VLEI_ROOT_SEED";
-    locateBridge();
   }
 
   static async deriveRootAid(
