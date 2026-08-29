@@ -1,0 +1,30 @@
+{
+  "name": "@luluguard/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "check-types": "tsc --noEmit",
+    "dev": "next dev",
+    "lint": "eslint .",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@google/genai": "^2.19.0",
+    "@modelcontextprotocol/sdk": "^1.17.3",
+    "next": "16.3.2",
+    "openai": "^5.19.1",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "24.13.3",
+    "@types/react": "19.1.12",
+    "@types/react-dom": "19.1.9",
+    "eslint": "10.9.1",
+    "typescript": "7.0.2"
+  }
+}

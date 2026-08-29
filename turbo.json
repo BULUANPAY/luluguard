@@ -1,17 +1,48 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "globalEnv": [
+    "AI_PROVIDER",
+    "GEMINI_API_KEY",
+    "GEMINI_MODEL",
+    "OPENAI_API_KEY",
+    "OPENAI_MODEL",
+    "MCP_SERVER_URL",
+    "SIGNER_PROVIDER",
+    "AWS_PROFILE",
+    "AWS_REGION",
+    "AWS_KMS_KEY_ID",
+    "AWS_KMS_ENDPOINT",
+    "MCP_HOST",
+    "MCP_PORT",
+    "MCP_API_KEY",
+    "CUSTOMS_BROKER_API_URL",
+    "CUSTOMS_BROKER_ADDRESS",
+    "CUSTOMS_BROKER_FEE_USDC",
+    "IMPORTER_ADDRESS",
+    "IMPORTER_PRIVATE_KEY",
+    "MAX_PAYMENT_USDC",
+    "MAX_DAILY_PAYMENT_USDC",
+    "MAX_PAYMENTS_PER_HOUR",
+    "HUMAN_APPROVAL_ABOVE_USDC",
+    "POLICY_ADMIN_API_KEY",
+    "X402_NETWORK",
+    "LOG_LEVEL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]
     },
     "check-types": {
       "dependsOn": ["^check-types"]
+    },
+    "test": {
+      "dependsOn": ["^test"]
     },
     "dev": {
       "cache": false,

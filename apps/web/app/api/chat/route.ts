@@ -1,0 +1,89 @@
+import { generateAiAnswer, type ChatMessage } from "../../../lib/ai";
+import { mcpResultText, withMcpClient } from "../../../lib/mcp";
+
+export const runtime = "nodejs";
+const instructions = `你是進口商 AI 助理。文件預檢階段只使用 review_import_documents，在進口商端檢查文件並產生獨立預估，不得聯絡報關行。
+使用者按下確認預估並詢價後，才使用 get_import_quote，把該 preflightId 的文件送給報關行，並比較 independentEstimate、quote 與 complianceReview。
+向使用者說明候選稅則、預估稅費、報關行服務費、有效期限、缺件、差異與付款 blocker。不得宣稱 AI 已完成法定稅則核定。
+只有使用者在後續訊息明確同意付款時，才可用該 quoteId 呼叫 submit_import_declaration；不可跳過報價，也不可自行將 humanApproved 設為 true。
+complianceReview.paymentAllowed 為 false 時，不得嘗試付款，必須先請使用者補正 blocker。
+請使用繁體中文簡潔回答，並清楚標示交易與申報結果。`;
+
+type WorkflowAction = "chat" | "precheck" | "broker_quote" | "payment";
+
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json()) as {
+      message?: string;
+      messages?: ChatMessage[];
+      selectedDocuments?: string[];
+      workflowAction?: WorkflowAction;
+      orderId?: string;
+      preflightId?: string;
+      quoteId?: string;
+    };
+    const selectedDocuments = (body.selectedDocuments ?? []).filter(document =>
+      ["commercial_invoice", "packing_list", "bill_of_lading", "certificate_of_origin", "product_specification", "import_permit"].includes(document)
+    );
+    const incoming = body.messages ?? (body.message ? [{ role: "user" as const, content: body.message }] : []);
+    const messages = incoming
+      .filter((item): item is ChatMessage =>
+        Boolean(item && (item.role === "user" || item.role === "assistant") && item.content?.trim())
+      )
+      .slice(-20);
+    const latest = messages.at(-1);
+    if (!latest || latest.role !== "user") {
+      return Response.json({ error: "最後一則訊息必須是使用者訊息" }, { status: 400 });
+    }
+    const paymentApproved = /(同意|核准|確認).{0,12}(付款|支付)|(付款|支付).{0,12}(同意|核准|確認)|approve.{0,12}pay/i.test(latest.content);
+    const workflowAction = body.workflowAction ?? "chat";
+    const workflow: { preflightId?: string; readyForBroker?: boolean; quoteId?: string } = {};
+    const answer = await withMcpClient(async (mcp) => {
+      const listed = await mcp.listTools();
+      const allowedTools = workflowAction === "precheck"
+        ? ["review_import_documents"]
+        : workflowAction === "broker_quote"
+          ? ["get_import_quote"]
+          : ["submit_import_declaration"];
+      const tools = listed.tools.filter(tool => allowedTools.includes(tool.name)).map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema as Record<string, unknown>
+      }));
+      return generateAiAnswer({
+        messages,
+        instructions: `${instructions}\n本次動作：${workflowAction}。前端訂單編號：${body.orderId ?? "未提供"}。前端目前勾選的文件：${selectedDocuments.join(", ") || "無"}。preflightId：${body.preflightId ?? "無"}。quoteId：${body.quoteId ?? "無"}。${workflowAction === "payment" ? "使用者已按下付款核准按鈕，你必須呼叫 submit_import_declaration。" : ""}`,
+        tools,
+        callTool: async (name, args) => {
+          if (name === "review_import_documents") {
+            args.orderId = body.orderId;
+            args.documentTypes = selectedDocuments;
+          }
+          if (name === "get_import_quote") {
+            args.preflightId = body.preflightId;
+            args.estimateApproved = workflowAction === "broker_quote";
+          }
+          if (name === "submit_import_declaration") {
+            args.orderId = body.orderId;
+            args.quoteId = body.quoteId;
+            args.humanApproved = workflowAction === "payment" || paymentApproved;
+          }
+          const output = mcpResultText(await mcp.callTool({ name, arguments: args }));
+          try {
+            const result = JSON.parse(output) as { preflightId?: string; readyForBroker?: boolean; quote?: { quoteId?: string } };
+            workflow.preflightId = result.preflightId;
+            workflow.readyForBroker = result.readyForBroker;
+            workflow.quoteId = result.quote?.quoteId;
+          } catch {
+            return output;
+          }
+          return output;
+        }
+      });
+    });
+    return Response.json({ answer, workflow });
+  } catch (error) {
+    console.error("chat.failed", error instanceof Error ? error.message : error);
+    return Response.json({ error: error instanceof Error ? error.message : "處理失敗" }, { status: 500 });
+  }
+}
