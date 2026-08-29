@@ -74,15 +74,15 @@ export async function POST(request: Request) {
         { status: 401 },
       );
     }
-    const body = (await request.json()) as {
+        const body = (await request.json()) as {
       message?: string;
       messages?: ChatMessage[];
       workflowAction?: WorkflowAction;
       orderId?: string;
       preflightId?: string;
       quoteId?: string;
-    };
-    writeAudit({
+        };
+        writeAudit({
       traceId,
       spanId: requestId,
       component: "chat-api",
@@ -96,10 +96,10 @@ export async function POST(request: Request) {
       agentRunId,
       data: { method: request.method, url: request.url, body },
     });
-    const incoming =
+        const incoming =
       body.messages ??
       (body.message ? [{ role: "user" as const, content: body.message }] : []);
-    const messages = incoming
+        const messages = incoming
       .filter((item): item is ChatMessage =>
         Boolean(
           item &&

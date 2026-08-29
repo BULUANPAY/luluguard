@@ -21,6 +21,7 @@ interface GenerateAnswerOptions {
   instructions: string;
   tools: AiTool[];
   callTool: (name: string, args: Record<string, unknown>) => Promise<string>;
+  onProgress?: (message: string) => void;
 }
 
 const maxToolRounds = 100;
@@ -295,6 +296,7 @@ async function generateWithGemini(
       calls.map(async (call) => {
         if (!call.name)
           throw new Error("Gemini 回傳了沒有名稱的 function call");
+        options.onProgress?.(`正在使用 MCP 工具：${call.name}…`);
         const spanId = call.id ?? newAuditId("TOOL");
         writeAudit({
           traceId: options.traceId,
@@ -355,6 +357,7 @@ async function generateWithGemini(
       actor: "ai-agent",
       data: { provider: "gemini", model, round: round + 1, functionResponses },
     });
+    options.onProgress?.("MCP 已回傳結果，正在整理回覆…");
     response = await chat.sendMessage({ message: functionResponses });
     writeAudit({
       traceId: options.traceId,

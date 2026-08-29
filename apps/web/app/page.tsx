@@ -46,6 +46,7 @@ export default function Home(): JSX.Element {
     },
   ]);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState("");
   const [preflightId, setPreflightId] = useState<string>();
   const [readyForBroker, setReadyForBroker] = useState(false);
   const [quoteId, setQuoteId] = useState<string>();
@@ -106,6 +107,7 @@ export default function Home(): JSX.Element {
     ];
     setMessages(nextMessages);
     setLoading(true);
+    setProgress("正在送出提問…");
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -147,6 +149,7 @@ export default function Home(): JSX.Element {
       ]);
     } finally {
       setLoading(false);
+      setProgress("");
     }
   }
   async function submit(event: FormEvent) {
@@ -335,12 +338,7 @@ export default function Home(): JSX.Element {
               <p>{item.content}</p>
             </div>
           ))}
-          {loading && (
-            <div className="message assistant">
-              <span>進口商 AI</span>
-              <p>處理中…</p>
-            </div>
-          )}
+          {loading && <div className="message assistant"><span>進口商 AI</span><p>{progress || "處理中…"}</p></div>}
         </div>
         <form onSubmit={submit}>
           <label htmlFor="message">繼續對話或明確核准付款</label>
