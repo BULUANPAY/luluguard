@@ -27,7 +27,9 @@
     "HUMAN_APPROVAL_ABOVE_USDC",
     "POLICY_ADMIN_API_KEY",
     "X402_NETWORK",
-    "LOG_LEVEL"
+    "LOG_LEVEL",
+    "VLEI_ROOT_SEED",
+    "VLEI_STATE_DIR"
   ],
   "tasks": {
     "build": {

@@ -29,6 +29,9 @@ out/
 build
 dist
 *.tsbuildinfo
+dist-test
+/.vlei-json-signing/
+__pycache__/
 
 
 # Debug
