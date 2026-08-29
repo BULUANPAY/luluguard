@@ -50,12 +50,19 @@ const employees: EmployeeRecord[] = [
 ];
 
 export const sandboxSessionCookie = "luluguard_sandbox_session";
+const sandboxSessionDurationMs = 8 * 60 * 60 * 1000;
+const allowedClockSkewMs = 30_000;
+const developmentSessionSecret =
+  "luluguard-sandbox-session-secret-change-me";
 
 function sessionSecret() {
-  return (
-    process.env.SANDBOX_SESSION_SECRET ??
-    "luluguard-sandbox-session-secret-change-me"
-  );
+  const configured = process.env.SANDBOX_SESSION_SECRET?.trim();
+  if (process.env.NODE_ENV === "production" && (!configured || configured.length < 32)) {
+    throw new Error(
+      "SANDBOX_SESSION_SECRET must contain at least 32 characters in production",
+    );
+  }
+  return configured || developmentSessionSecret;
 }
 
 function sign(encodedPayload: string) {
@@ -102,7 +109,7 @@ export function createSandboxSession(employee: SandboxEmployee): {
     employee,
     sessionId: `SESSION-${randomUUID()}`,
     issuedAt: issuedAt.toISOString(),
-    expiresAt: new Date(issuedAt.getTime() + 8 * 60 * 60 * 1000).toISOString(),
+    expiresAt: new Date(issuedAt.getTime() + sandboxSessionDurationMs).toISOString(),
   };
   const payload = Buffer.from(JSON.stringify(session)).toString("base64url");
   return { session, token: `${payload}.${sign(payload)}` };
@@ -122,18 +129,51 @@ export function verifySandboxSession(
   )
     return undefined;
   try {
-    const session = JSON.parse(
+    const value: unknown = JSON.parse(
       Buffer.from(payload, "base64url").toString("utf8"),
-    ) as SandboxSession;
-    if (Date.parse(session.expiresAt) <= Date.now()) return undefined;
+    );
+    if (!isRecord(value) || !isRecord(value.employee)) return undefined;
+    const { issuedAt, expiresAt, sessionId } = value;
+    const employeeId = value.employee.id;
+    if (
+      typeof issuedAt !== "string" ||
+      typeof expiresAt !== "string" ||
+      typeof sessionId !== "string" ||
+      !sessionId.trim() ||
+      typeof employeeId !== "string"
+    ) {
+      return undefined;
+    }
+    const issuedAtMs = Date.parse(issuedAt);
+    const expiresAtMs = Date.parse(expiresAt);
+    const now = Date.now();
+    if (
+      !Number.isFinite(issuedAtMs) ||
+      !Number.isFinite(expiresAtMs) ||
+      issuedAtMs > now + allowedClockSkewMs ||
+      expiresAtMs <= now ||
+      expiresAtMs <= issuedAtMs ||
+      expiresAtMs - issuedAtMs > sandboxSessionDurationMs
+    ) {
+      return undefined;
+    }
     const employee = employees.find(
-      (candidate) => candidate.id === session.employee.id,
+      (candidate) => candidate.id === employeeId,
     );
     if (!employee) return undefined;
-    return { ...session, employee: publicEmployee(employee) };
+    return {
+      sessionId,
+      issuedAt,
+      expiresAt,
+      employee: publicEmployee(employee),
+    };
   } catch {
     return undefined;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function sessionFromRequest(

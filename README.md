@@ -64,6 +64,7 @@ Configure `apps/web/.env.local`:
 | `OPENAI_MODEL`            | OpenAI model name                                      |
 | `MCP_SERVER_URL`          | Importer MCP URL, normally `http://127.0.0.1:4020/mcp` |
 | `MCP_API_KEY`             | Must exactly match the Importer MCP value              |
+| `SANDBOX_SESSION_SECRET`  | Session HMAC secret; at least 32 characters in production |
 | `VLEI_VERIFY_MCP_COMMAND` | Optional verifier command; defaults to `pnpm`          |
 | `VLEI_VERIFY_MCP_ARGS`    | Optional JSON array of command arguments               |
 | `VLEI_VERIFY_MCP_CWD`     | Optional cwd; defaults to the workspace root           |
