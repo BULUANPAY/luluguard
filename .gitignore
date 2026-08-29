@@ -43,6 +43,9 @@ __pycache__/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+logs/
+**/logs/
+*.jsonl
 
 # Misc
 .DS_Store

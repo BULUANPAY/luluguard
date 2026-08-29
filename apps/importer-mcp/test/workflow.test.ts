@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ImporterAgent } from "../src/importer-agent.js";
+import { getMockExportDocuments } from "../src/mock-exporter.js";
 import type { DutyQuote } from "../src/domain.js";
 
 const importerAddress = "0x1111111111111111111111111111111111111111";
@@ -68,13 +69,13 @@ function createAgent(
 }
 
 async function precheckAndQuote(agent: ImporterAgent, orderId: string) {
-  const preflight = agent.precheck(orderId);
+  const preflight = agent.precheck(orderId, getMockExportDocuments(orderId));
   return agent.getQuote(preflight.preflightId, true);
 }
 
 test("precheck estimates costs without calling the broker", () => {
   let brokerCalled = false;
-  const result = createAgent(undefined, undefined, freeQuoteFetch(() => { brokerCalled = true; })).precheck("TEST-PREFLIGHT");
+  const result = createAgent(undefined, undefined, freeQuoteFetch(() => { brokerCalled = true; })).precheck("TEST-PREFLIGHT", getMockExportDocuments("TEST-PREFLIGHT"));
   assert.equal(result.readyForBroker, true);
   assert.equal(result.transmittedToBroker, false);
   assert.equal(result.independentEstimate?.estimatedTotalUsd, 134.96);
@@ -152,7 +153,7 @@ test("submission rechecks quote expiration immediately before payment", async ()
     JSON.stringify({ quote: expiredQuote }),
     { status: 200, headers: { "content-type": "application/json" } }
   ));
-  const preflight = agent.precheck("TEST-EXPIRED");
+  const preflight = agent.precheck("TEST-EXPIRED", getMockExportDocuments("TEST-EXPIRED"));
   const result = await agent.getQuote(preflight.preflightId, true);
   assert.equal(result.complianceReview.paymentAllowed, false);
   await assert.rejects(() => agent.submit("TEST-EXPIRED", quoteId, true), /comparison blocked payment/);
@@ -161,7 +162,7 @@ test("submission rechecks quote expiration immediately before payment", async ()
 test("missing required documents are blocked before broker transmission", async () => {
   let brokerCalled = false;
   const agent = createAgent(undefined, undefined, freeQuoteFetch(() => { brokerCalled = true; }));
-  const result = agent.precheck("TEST-MISSING", ["commercial_invoice"]);
+  const result = agent.precheck("TEST-MISSING", getMockExportDocuments("TEST-MISSING", ["commercial_invoice"]));
   assert.equal(result.documentReview.readyToTransmit, false);
   assert.equal(result.transmittedToBroker, false);
   assert.equal(brokerCalled, false);
@@ -174,7 +175,7 @@ test("missing required documents are blocked before broker transmission", async 
 test("broker quote requires explicit estimate confirmation", async () => {
   let brokerCalled = false;
   const agent = createAgent(undefined, undefined, freeQuoteFetch(() => { brokerCalled = true; }));
-  const preflight = agent.precheck("TEST-NO-CONFIRM");
+  const preflight = agent.precheck("TEST-NO-CONFIRM", getMockExportDocuments("TEST-NO-CONFIRM"));
   await assert.rejects(() => agent.getQuote(preflight.preflightId, false), /must confirm/);
   assert.equal(brokerCalled, false);
 });

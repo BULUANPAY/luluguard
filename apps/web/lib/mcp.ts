@@ -7,19 +7,64 @@ import {
   StdioClientTransport
 } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { writeAudit } from "./audit";
 
-export async function withMcpClient<T>(operation: (client: Client) => Promise<T>): Promise<T> {
+export async function withMcpClient<T>(
+  traceId: string,
+  operation: (client: Client) => Promise<T>,
+): Promise<T> {
   const url = process.env.MCP_SERVER_URL ?? "http://127.0.0.1:4020/mcp";
   const apiKey = process.env.MCP_API_KEY;
   const client = new Client({ name: "x402-ai-web", version: "0.1.0" });
   const transport = new StreamableHTTPClientTransport(new URL(url), {
-    requestInit: apiKey ? { headers: { Authorization: `Bearer ${apiKey}` } } : undefined
+    requestInit: {
+      headers: {
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        "x-audit-trace-id": traceId,
+      },
+    },
   });
-  await client.connect(transport);
+  writeAudit({
+    traceId,
+    component: "mcp-client",
+    action: "connection.open",
+    status: "attempted",
+    actor: "ai-agent",
+    data: { url },
+  });
+  try {
+    await client.connect(transport);
+    writeAudit({
+      traceId,
+      component: "mcp-client",
+      action: "connection.open",
+      status: "succeeded",
+      actor: "mcp-server",
+      data: { url },
+    });
+  } catch (error) {
+    writeAudit({
+      traceId,
+      component: "mcp-client",
+      action: "connection.open",
+      status: "failed",
+      actor: "mcp-server",
+      data: { url, error },
+    });
+    throw error;
+  }
   try {
     return await operation(client);
   } finally {
     await client.close();
+    writeAudit({
+      traceId,
+      component: "mcp-client",
+      action: "connection.close",
+      status: "succeeded",
+      actor: "ai-agent",
+      data: { url },
+    });
   }
 }
 
@@ -67,12 +112,22 @@ export async function withVleiVerifyMcpClient<T>(operation: (client: Client) => 
 }
 
 export function mcpResultText(result: unknown): string {
-  if (!result || typeof result !== "object" || !("content" in result) || !Array.isArray(result.content)) {
+  if (
+    !result ||
+    typeof result !== "object" ||
+    !("content" in result) ||
+    !Array.isArray(result.content)
+  ) {
     return JSON.stringify(result);
   }
   return result.content
     .filter((item): item is { type: "text"; text: string } =>
-      Boolean(item && typeof item === "object" && item.type === "text" && typeof item.text === "string")
+      Boolean(
+        item &&
+        typeof item === "object" &&
+        item.type === "text" &&
+        typeof item.text === "string",
+      ),
     )
     .map((item) => item.text)
     .join("\n");
