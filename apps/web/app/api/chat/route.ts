@@ -13,6 +13,32 @@ complianceReview.paymentAllowed 為 false 時，不得嘗試付款，必須先�
 
 type WorkflowAction = "chat" | "precheck" | "broker_quote" | "payment";
 
+type UploadedFile = {
+  documentType: string;
+  filename: string;
+  content: unknown;
+};
+
+function requestedVleiDocumentTypes(message: string): string[] | undefined {
+  if (!/vlei/i.test(message) || !/(驗證|簽章|signature|verify|valid)/i.test(message)) return undefined;
+
+  const types: string[] = [];
+  if (/(packing\s*list|裝箱單|P\s*\/\s*L)/i.test(message)) types.push("packing_list");
+  if (/(commercial\s*invoice|商業發票|invoice|I\s*\/\s*V)/i.test(message)) types.push("commercial_invoice");
+  return types.length > 0 ? types : [];
+}
+
+function parseUploadedFiles(output: string): UploadedFile[] {
+  const parsed = JSON.parse(output) as { files?: unknown };
+  if (!Array.isArray(parsed.files)) throw new Error("get_order_files 未回傳 files array");
+  return parsed.files.filter((file): file is UploadedFile => Boolean(
+    file && typeof file === "object"
+      && "documentType" in file && typeof file.documentType === "string"
+      && "filename" in file && typeof file.filename === "string"
+      && "content" in file
+  ));
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
@@ -42,6 +68,29 @@ export async function POST(request: Request) {
     const workflow: { preflightId?: string; readyForBroker?: boolean; quoteId?: string } = {};
     const answer = await withMcpClient(async (mcp) => withVleiVerifyMcpClient(async (vleiMcp) => {
       const [listed, vleiListed] = await Promise.all([mcp.listTools(), vleiMcp.listTools()]);
+      const requestedTypes = requestedVleiDocumentTypes(latest.content);
+      let verifiedUploadContext = "";
+      if (requestedTypes) {
+        if (!body.orderId) throw new Error("驗證已上傳文件時必須提供 orderId");
+        const fileOutput = mcpResultText(await mcp.callTool({
+          name: "get_order_files",
+          arguments: {
+            orderId: body.orderId,
+            ...(requestedTypes.length > 0 ? { documentTypes: requestedTypes } : {})
+          }
+        }));
+        const files = parseUploadedFiles(fileOutput);
+        if (files.length === 0) throw new Error("找不到符合驗證要求的已上傳文件");
+        const verificationResults = await Promise.all(files.map(async (file) => ({
+          documentType: file.documentType,
+          filename: file.filename,
+          result: JSON.parse(mcpResultText(await vleiMcp.callTool({
+            name: "verify_vlei_json",
+            arguments: { envelope: file.content }
+          }))) as unknown
+        })));
+        verifiedUploadContext = `\n後端已強制透過 MCP 讀取並驗證使用者指定的已上傳文件。以下是實際工具結果，回答時必須忠實採用，不得自行推測或改寫 valid 與 errors，也不必再次呼叫工具：\n${JSON.stringify(verificationResults)}`;
+      }
       const fileTools = ["get_order_files"];
       const allowedTools = workflowAction === "precheck"
         ? [...fileTools, "review_import_documents"]
@@ -59,7 +108,7 @@ export async function POST(request: Request) {
       }));
       return generateAiAnswer({
         messages,
-        instructions: `${instructions}\n本次動作：${workflowAction}。前端訂單編號：${body.orderId ?? "未提供"}。前端目前勾選的文件：${selectedDocuments.join(", ") || "無"}。preflightId：${body.preflightId ?? "無"}。quoteId：${body.quoteId ?? "無"}。${workflowAction === "payment" ? "使用者已按下付款核准按鈕，你必須呼叫 submit_import_declaration。" : ""}`,
+        instructions: `${instructions}\n本次動作：${workflowAction}。前端訂單編號：${body.orderId ?? "未提供"}。前端目前勾選的文件：${selectedDocuments.join(", ") || "無"}。preflightId：${body.preflightId ?? "無"}。quoteId：${body.quoteId ?? "無"}。${workflowAction === "payment" ? "使用者已按下付款核准按鈕，你必須呼叫 submit_import_declaration。" : ""}${verifiedUploadContext}`,
         tools,
         callTool: async (name, args) => {
           if (name === "review_import_documents") {
