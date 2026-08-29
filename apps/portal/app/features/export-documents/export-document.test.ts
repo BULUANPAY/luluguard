@@ -72,4 +72,29 @@ describe("export document helpers", () => {
       parseExportDocument(JSON.stringify(document), "COMMERCIAL_INVOICE"),
     ).toThrow("JSON 內容不一致");
   });
+
+  it("round-trips a complete export document", () => {
+    const document = createTestExportDocument(
+      "COMMERCIAL_INVOICE",
+      "Sinclair Livestock Exports Ltd.",
+    );
+
+    expect(parseExportDocument(JSON.stringify(document))).toEqual(document);
+  });
+
+  it("rejects incomplete nested data before rendering the editor", () => {
+    const document = createTestExportDocument(
+      "COMMERCIAL_INVOICE",
+      "Sinclair Livestock Exports Ltd.",
+    );
+    const missingShipment = structuredClone(document) as Partial<typeof document>;
+    delete missingShipment.shipment;
+
+    expect(() => parseExportDocument(JSON.stringify(missingShipment))).toThrow(
+      /shipment/,
+    );
+    expect(() =>
+      parseExportDocument(JSON.stringify({ ...document, items: [] })),
+    ).toThrow(/items/);
+  });
 });
