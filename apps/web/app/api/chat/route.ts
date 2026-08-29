@@ -43,8 +43,13 @@ function parseUploadedFiles(output: string): UploadedFile[] {
 }
 
 export async function POST(request: Request) {
-  try {
-    const body = (await request.json()) as {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: Record<string, unknown>) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      try {
+        send({ type: "progress", message: "正在將提問交給 AI…" });
+        const body = (await request.json()) as {
       message?: string;
       messages?: ChatMessage[];
       selectedDocuments?: string[];
@@ -52,24 +57,23 @@ export async function POST(request: Request) {
       orderId?: string;
       preflightId?: string;
       quoteId?: string;
-    };
-    const selectedDocuments = (body.selectedDocuments ?? []).filter(document =>
+        };
+        const selectedDocuments = (body.selectedDocuments ?? []).filter(document =>
       ["commercial_invoice", "packing_list", "bill_of_lading", "certificate_of_origin", "product_specification", "import_permit"].includes(document)
     );
-    const incoming = body.messages ?? (body.message ? [{ role: "user" as const, content: body.message }] : []);
-    const messages = incoming
+        const incoming = body.messages ?? (body.message ? [{ role: "user" as const, content: body.message }] : []);
+        const messages = incoming
       .filter((item): item is ChatMessage =>
         Boolean(item && (item.role === "user" || item.role === "assistant") && item.content?.trim())
       )
       .slice(-20);
-    const latest = messages.at(-1);
-    if (!latest || latest.role !== "user") {
-      return Response.json({ error: "最後一則訊息必須是使用者訊息" }, { status: 400 });
-    }
-    const paymentApproved = /(同意|核准|確認).{0,12}(付款|支付)|(付款|支付).{0,12}(同意|核准|確認)|approve.{0,12}pay/i.test(latest.content);
-    const workflowAction = body.workflowAction ?? "chat";
-    const workflow: { preflightId?: string; readyForBroker?: boolean; quoteId?: string } = {};
-    const answer = await withMcpClient(async (mcp) => withVleiVerifyMcpClient(async (vleiMcp) => {
+        const latest = messages.at(-1);
+        if (!latest || latest.role !== "user") throw new Error("最後一則訊息必須是使用者訊息");
+        const paymentApproved = /(同意|核准|確認).{0,12}(付款|支付)|(付款|支付).{0,12}(同意|核准|確認)|approve.{0,12}pay/i.test(latest.content);
+        const workflowAction = body.workflowAction ?? "chat";
+        const workflow: { preflightId?: string; readyForBroker?: boolean; quoteId?: string } = {};
+        send({ type: "progress", message: "正在連線至 MCP 服務…" });
+        const answer = await withMcpClient(async (mcp) => withVleiVerifyMcpClient(async (vleiMcp) => {
       const [listed, vleiListed] = await Promise.all([mcp.listTools(), vleiMcp.listTools()]);
       const hasVleiVerifier = vleiListed.tools.some(tool => tool.name === "verify_vlei_json");
       const fileTools = ["get_order_files"];
@@ -95,6 +99,7 @@ export async function POST(request: Request) {
         messages,
         instructions: `${instructions}\n本次動作：${workflowAction}。前端訂單編號：${body.orderId ?? "未提供"}。前端目前勾選的文件：${selectedDocuments.join(", ") || "無"}。preflightId：${body.preflightId ?? "無"}。quoteId：${body.quoteId ?? "無"}。${workflowAction === "payment" ? "使用者已按下付款核准按鈕，你必須呼叫 submit_import_declaration。" : ""}`,
         tools,
+        onProgress: message => send({ type: "progress", message }),
         callTool: async (name, args) => {
           if (name === "verify_uploaded_vlei_documents") {
             if (!body.orderId) throw new Error("驗證已上傳文件時必須提供 orderId");
@@ -146,9 +151,19 @@ export async function POST(request: Request) {
         }
       });
     }));
-    return Response.json({ answer, workflow });
-  } catch (error) {
-    console.error("chat.failed", error instanceof Error ? error.message : error);
-    return Response.json({ error: error instanceof Error ? error.message : "處理失敗" }, { status: 500 });
-  }
+        send({ type: "result", answer, workflow });
+      } catch (error) {
+        console.error("chat.failed", error instanceof Error ? error.message : error);
+        send({ type: "result", error: error instanceof Error ? error.message : "處理失敗" });
+      } finally {
+        controller.close();
+      }
+    }
+  });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform"
+    }
+  });
 }

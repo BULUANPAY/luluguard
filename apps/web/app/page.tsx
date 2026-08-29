@@ -5,6 +5,9 @@ import { DocumentUpload } from "./components/document-upload";
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type WorkflowAction = "chat" | "precheck" | "broker_quote" | "payment";
 type WorkflowResponse = { preflightId?: string; readyForBroker?: boolean; quoteId?: string };
+type ChatEvent =
+  | { type: "progress"; message: string }
+  | { type: "result"; answer?: string; error?: string; workflow?: WorkflowResponse };
 const documentOptions = [
   { type: "commercial_invoice", label: "商業發票", detail: "品名、價格、交易條件", required: true },
   { type: "packing_list", label: "裝箱單", detail: "件數、毛重與淨重", required: true },
@@ -22,6 +25,7 @@ export default function Home(): ReactNode {
     { role: "assistant", content: "你好，我是進口商 AI Agent。請選擇文件後先執行 AI 文件檢查與獨立估價。" }
   ]);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState("");
   const [preflightId, setPreflightId] = useState<string>();
   const [readyForBroker, setReadyForBroker] = useState(false);
   const [quoteId, setQuoteId] = useState<string>();
@@ -45,6 +49,7 @@ export default function Home(): ReactNode {
     const nextMessages: ChatMessage[] = [...messages, { role: "user", content: userContent }];
     setMessages(nextMessages);
     setLoading(true);
+    setProgress("正在送出提問…");
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -58,7 +63,25 @@ export default function Home(): ReactNode {
           quoteId
         })
       });
-      const data = (await response.json()) as { answer?: string; error?: string; workflow?: WorkflowResponse };
+      if (!response.body) throw new Error("伺服器未回傳可讀取的內容");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let data: Extract<ChatEvent, { type: "result" }> | undefined;
+      while (true) {
+        const { done, value } = await reader.read();
+        buffer += decoder.decode(value, { stream: !done });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line) as ChatEvent;
+          if (event.type === "progress") setProgress(event.message);
+          if (event.type === "result") data = event;
+        }
+        if (done) break;
+      }
+      if (!data) throw new Error("伺服器未回傳最終結果");
       if (data.workflow?.preflightId) setPreflightId(data.workflow.preflightId);
       if (data.workflow?.readyForBroker !== undefined) setReadyForBroker(data.workflow.readyForBroker);
       if (data.workflow?.quoteId) setQuoteId(data.workflow.quoteId);
@@ -73,6 +96,7 @@ export default function Home(): ReactNode {
       ]);
     } finally {
       setLoading(false);
+      setProgress("");
     }
   }
   async function submit(event: FormEvent) {
@@ -145,7 +169,7 @@ export default function Home(): ReactNode {
               <span>{item.role === "user" ? "你" : "進口商 AI"}</span><p>{item.content}</p>
             </div>
           ))}
-          {loading && <div className="message assistant"><span>進口商 AI</span><p>處理中…</p></div>}
+          {loading && <div className="message assistant"><span>進口商 AI</span><p>{progress || "處理中…"}</p></div>}
         </div>
         <form onSubmit={submit}>
           <label htmlFor="message">繼續對話或明確核准付款</label>

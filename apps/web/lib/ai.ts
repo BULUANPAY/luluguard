@@ -17,6 +17,7 @@ interface GenerateAnswerOptions {
   instructions: string;
   tools: AiTool[];
   callTool: (name: string, args: Record<string, unknown>) => Promise<string>;
+  onProgress?: (message: string) => void;
 }
 
 const maxToolRounds = 30;
@@ -50,12 +51,16 @@ async function generateWithOpenAi(options: GenerateAnswerOptions): Promise<strin
     const calls = response.output.filter((item) => item.type === "function_call");
     if (calls.length === 0) return response.output_text;
     const outputs = await Promise.all(
-      calls.map(async (call) => ({
-        type: "function_call_output" as const,
-        call_id: call.call_id,
-        output: await options.callTool(call.name, JSON.parse(call.arguments) as Record<string, unknown>)
-      }))
+      calls.map(async (call) => {
+        options.onProgress?.(`正在使用 MCP 工具：${call.name}…`);
+        return {
+          type: "function_call_output" as const,
+          call_id: call.call_id,
+          output: await options.callTool(call.name, JSON.parse(call.arguments) as Record<string, unknown>)
+        };
+      })
     );
+    options.onProgress?.("MCP 已回傳結果，正在整理回覆…");
     response = await openai.responses.create({
       model,
       instructions: options.instructions,
@@ -95,6 +100,7 @@ async function generateWithGemini(options: GenerateAnswerOptions): Promise<strin
     const functionResponses = await Promise.all(
       calls.map(async (call) => {
         if (!call.name) throw new Error("Gemini 回傳了沒有名稱的 function call");
+        options.onProgress?.(`正在使用 MCP 工具：${call.name}…`);
         const output = await options.callTool(call.name, call.args ?? {});
         return {
           functionResponse: {
@@ -105,6 +111,7 @@ async function generateWithGemini(options: GenerateAnswerOptions): Promise<strin
         };
       })
     );
+    options.onProgress?.("MCP 已回傳結果，正在整理回覆…");
     response = await chat.sendMessage({ message: functionResponses });
   }
   throw new Error("AI 工具呼叫次數超過上限");
