@@ -30,8 +30,9 @@ openssl rand -base64 48
 影響最終 root AID。
 
 Seed 只應存在秘密管理系統或環境變數，不會寫入 package state 或簽章 envelope。
-預設 state 位於 `.vlei-json-signing/state.json`，其中包含 signer private seeds，
-必須視為敏感資料。
+Package 會統一將 state 儲存在 package 目錄內的
+`.vlei-json-signing/state.json`，其中包含 signer private seeds，必須視為敏感資料；
+使用 package 的 app 不需要自行設定 state directory。
 
 ## Legal Entity Identifier
 

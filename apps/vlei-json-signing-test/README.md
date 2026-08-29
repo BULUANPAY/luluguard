@@ -31,5 +31,5 @@ cp .env.example .env
 
 將其中的 placeholder 換成秘密字串，再執行相同指令。
 
-簽章 state 預設固定寫入 repository root 的 `.vlei-json-signing/`，並會沿用前一次
-測試狀態。若設定 `VLEI_STATE_DIR`，相對路徑同樣以 repository root 為基準。
+簽章 state 由 `@repo/vlei-json-signing` 統一管理，固定寫入該 package 內的
+`.vlei-json-signing/`，並會沿用前一次測試狀態。

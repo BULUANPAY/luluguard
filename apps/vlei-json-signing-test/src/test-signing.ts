@@ -1,7 +1,4 @@
 import assert from "node:assert/strict";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { VleiJsonSigning } from "@repo/vlei-json-signing";
 
 if (!process.env.VLEI_ROOT_SEED) {
@@ -11,18 +8,7 @@ if (!process.env.VLEI_ROOT_SEED) {
   );
 }
 
-const repositoryRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../..",
-);
-const stateDir = path.resolve(
-  repositoryRoot,
-  process.env.VLEI_STATE_DIR ?? ".vlei-json-signing",
-);
-
-const signing = new VleiJsonSigning({
-  stateDir,
-});
+const signing = new VleiJsonSigning();
 
 const { rootAid } = await signing.initialize();
 const derivedRootAid = await VleiJsonSigning.deriveRootAid(
@@ -52,7 +38,7 @@ const envelope = await signing.signJson({
 
 console.log("Root AID:", rootAid);
 console.log("Legal Entity Identifier:", lei);
-console.log("State directory:", stateDir);
+console.log("State directory:", signing.stateDir);
 console.log("Signer:", signer);
 console.log("Signed envelope:");
 console.log(JSON.stringify(envelope, null, 2));
