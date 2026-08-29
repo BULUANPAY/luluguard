@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   Dices,
+  Download,
   FileText,
   LockKeyhole,
   ShieldCheck,
@@ -27,6 +28,7 @@ import {
   type ExportDocument,
   type ExportDocumentType,
 } from "../features/export-documents/export-document";
+import { downloadSignedResponse } from "../features/export-documents/response-download";
 import {
   signExportDocument,
   type SignedExportDocumentEnvelope,
@@ -108,6 +110,7 @@ function ExportDocumentWorkspace({
       const result = await signExportDocument(currentDocument);
       setEnvelope(result);
       setSubmitState("success");
+      downloadSignedResponse(result);
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "送出失敗，請稍後再試。",
@@ -197,7 +200,7 @@ function ExportDocumentWorkspace({
               >
                 <div className="flex items-center gap-2 font-bold">
                   <CheckCircle2 className="size-4" />
-                  文件已完成 vLEI JSON 簽章
+                  文件已完成 vLEI JSON 簽章，回應已下載
                 </div>
                 <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
                   <ResultItem label="Signer ID" value={envelope.signerId} />
@@ -214,6 +217,16 @@ function ExportDocumentWorkspace({
                     value={envelope.protected.signedAt}
                   />
                 </dl>
+                <Button
+                  className="mt-4 border-emerald-300 bg-white/60 text-emerald-900 hover:bg-white"
+                  onClick={() => downloadSignedResponse(envelope)}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <Download className="size-4" />
+                  再次下載 JSON
+                </Button>
               </div>
             ) : null}
           </CardContent>
