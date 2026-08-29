@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.json",
     "check-types": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
-    "test-vlei": "pnpm --filter @repo/vlei-json-signing build && pnpm run build && node --env-file-if-exists=../../.env dist/test-signing.js"
+    "test-vlei": "pnpm --filter @repo/vlei-json-signing build && pnpm run build && node --env-file-if-exists=../../.env dist/test-signing.js",
+    "test-vlei-verify": "pnpm --filter @repo/vlei-json-signing build && pnpm run build && node --env-file-if-exists=../../.env dist/test-verify.js"
   },
   "dependencies": {
     "@repo/vlei-json-signing": "workspace:*"
