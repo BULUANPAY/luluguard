@@ -1,6 +1,20 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "globalEnv": [
+    "MCP_HOST",
+    "MCP_PORT",
+    "MCP_API_KEY",
+    "CUSTOMS_BROKER_API_URL",
+    "CUSTOMS_BROKER_ADDRESS",
+    "CUSTOMS_BROKER_FEE_USDC",
+    "IMPORTER_ADDRESS",
+    "IMPORTER_PRIVATE_KEY",
+    "MAX_PAYMENT_USDC",
+    "HUMAN_APPROVAL_ABOVE_USDC",
+    "X402_NETWORK",
+    "LOG_LEVEL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -12,6 +26,9 @@
     },
     "check-types": {
       "dependsOn": ["^check-types"]
+    },
+    "test": {
+      "dependsOn": ["^test"]
     },
     "dev": {
       "cache": false,
