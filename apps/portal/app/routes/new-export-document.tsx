@@ -30,9 +30,12 @@ import {
 } from "../features/export-documents/export-document";
 import { downloadSignedResponse } from "../features/export-documents/response-download";
 import {
+  DEFAULT_SIGNING_LEI,
   signExportDocument,
   type SignedExportDocumentEnvelope,
+  type SigningIdentity,
 } from "../features/export-documents/signing-client";
+import { SigningIdentityDialog } from "../features/export-documents/signing-identity-dialog";
 
 export function meta() {
   return [{ title: "產生出口文件｜LuLuGuard" }];
@@ -71,6 +74,7 @@ function ExportDocumentWorkspace({
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [error, setError] = useState<string>();
   const [envelope, setEnvelope] = useState<SignedExportDocumentEnvelope>();
+  const [isSignDialogOpen, setIsSignDialogOpen] = useState(false);
 
   const resetWithDocument = (nextType: ExportDocumentType) => {
     const nextDocument = createRandomExportDocument(nextType, exporterCompany);
@@ -102,12 +106,12 @@ function ExportDocumentWorkspace({
     }
   };
 
-  const submit = async () => {
+  const submit = async (identity: SigningIdentity) => {
     setSubmitState("submitting");
     setEnvelope(undefined);
     try {
       const currentDocument = readEditor();
-      const result = await signExportDocument(currentDocument);
+      const result = await signExportDocument(currentDocument, identity);
       setEnvelope(result);
       setSubmitState("success");
       downloadSignedResponse(result);
@@ -190,8 +194,24 @@ function ExportDocumentWorkspace({
               }}
               onPreview={updatePreview}
               onRegenerate={() => resetWithDocument(documentType)}
-              onSubmit={submit}
+              onSubmit={() => setIsSignDialogOpen(true)}
             />
+
+            {isSignDialogOpen ? (
+              <SigningIdentityDialog
+                defaultValues={{
+                  lei: DEFAULT_SIGNING_LEI,
+                  signer: document.issuer.authorized_signatory,
+                  role: document.issuer.role,
+                }}
+                isSubmitting={submitState === "submitting"}
+                onCancel={() => setIsSignDialogOpen(false)}
+                onConfirm={(identity) => {
+                  setIsSignDialogOpen(false);
+                  void submit(identity);
+                }}
+              />
+            ) : null}
 
             {submitState === "success" && envelope ? (
               <div

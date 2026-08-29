@@ -34,13 +34,24 @@ describe("vLEI signing client", () => {
       },
     );
 
-    const result = await signExportDocument(document, fetcher as typeof fetch);
+    const result = await signExportDocument(
+      document,
+      {
+        lei: DEMO_SIGNING_LEI,
+        signer: document.issuer.authorized_signatory,
+        role: document.issuer.role,
+      },
+      fetcher as typeof fetch,
+    );
 
     expect(result.signerId).toBe("signer-123");
     const body = JSON.parse(String(capturedInit?.body));
     expect(body.lei).toBe(DEMO_SIGNING_LEI);
     expect(body.payload.document_id).toBe(document.document_id);
     expect(body.signerInfo.organization).toBe(document.issuer.organization);
+    expect(body.signerInfo.authorizedSignatory).toBe(
+      document.issuer.authorized_signatory,
+    );
     expect(body.signerInfo.documentSource).toBe(
       "LuLuGuard exporter workspace",
     );
