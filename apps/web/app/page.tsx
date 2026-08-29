@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useState, type JSX } from "react";
 import { DocumentUpload } from "./components/document-upload";
+import exampleOrders from "./example-orders.json";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type WorkflowAction = "chat" | "precheck" | "broker_quote" | "payment";
@@ -28,7 +29,6 @@ type VleiAuthorizationSummary = {
   signerAid: string;
   signerCredentialSaid: string;
 };
-const orderOptions = ["ORD-1001", "ORD-1002", "ORD-1003", "ORD-1004"];
 
 export default function Home(): JSX.Element {
   const [session, setSession] = useState<EmployeeSession>();
@@ -36,7 +36,7 @@ export default function Home(): JSX.Element {
   const [username, setUsername] = useState("alice");
   const [password, setPassword] = useState("alice-demo");
   const [loginError, setLoginError] = useState("");
-  const [orderId, setOrderId] = useState("ORD-1001");
+  const [orderId, setOrderId] = useState(exampleOrders[0]?.orderId ?? "");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -254,14 +254,13 @@ export default function Home(): JSX.Element {
           </div>
           <label className="order-field" htmlFor="orderId">
             訂單編號
-            <input
-              id="orderId"
-              value={orderId}
-              onChange={(event) => {
-                setOrderId(event.target.value);
-                resetPreflight();
-              }}
-            />
+            <select id="orderId" value={orderId} onChange={event => { setOrderId(event.target.value); resetPreflight(); }}>
+              {exampleOrders.map(order => (
+                <option key={order.orderId} value={order.orderId}>
+                  {order.orderId} — {order.importer.name} ({order.importer.lei})
+                </option>
+              ))}
+            </select>
           </label>
           <p className="document-note">
             AI 會讀取此訂單目前已上傳的文件（見下方「上傳訂單文件」）進行檢查與獨立估價。變更訂單或上傳文件後，既有預檢會失效，必須重新由 AI 檢查。

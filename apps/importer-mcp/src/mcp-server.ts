@@ -16,7 +16,7 @@ import {
   type VerifiedAgentAuthorization,
 } from "./vlei-authorization.js";
 import { getOrderFiles } from "./order-files.js";
-import { buildExportDocumentsFromUploads } from "./order-documents.js";
+import { buildExportDocuments } from "./uploaded-documents.js";
 
 const uploadedFilesRoot = path.resolve(process.cwd(), "../..", "uploaded-files");
 const preflightStore = new Map();
@@ -87,7 +87,7 @@ function createServer(traceId = newAuditId("TRACE")) {
     "review_import_documents",
     {
       description:
-        "讀取訂單目前已上傳的文件並產生獨立費用預估。此工具不會聯絡報關行、不會付款。",
+        "讀取指定訂單在 uploaded-files 內的所有 JSON 文件，在進口商端檢查並產生獨立費用預估。此工具不會聯絡報關行、不會付款。",
       inputSchema: {
         orderId: z
           .string()
@@ -125,7 +125,8 @@ function createServer(traceId = newAuditId("TRACE")) {
           resource: { orderId },
         });
         policyStore.assertAgentEnabled();
-        const documents = await buildExportDocumentsFromUploads(uploadedFilesRoot, orderId);
+        const files = await getOrderFiles(uploadedFilesRoot, orderId);
+        const documents = buildExportDocuments(files);
         const result = (await createAgent(false, identity)).precheck(
           orderId,
           documents,
