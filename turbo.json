@@ -33,7 +33,14 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "!.next/dev/**",
+        "build/**",
+        "dist/**",
+        "src/generated/**"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]
@@ -42,7 +49,7 @@
       "dependsOn": ["^check-types"]
     },
     "test": {
-      "dependsOn": ["^test"]
+      "dependsOn": ["^build", "^test"]
     },
     "dev": {
       "cache": false,

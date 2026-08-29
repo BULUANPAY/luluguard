@@ -1,0 +1,29 @@
+{
+  "name": "@luluguard/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./models": "./src/generated/models/index.ts"
+  },
+  "scripts": {
+    "generate": "orval --config orval.config.ts",
+    "build": "pnpm generate",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.102.8",
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/react": "^19.2.18",
+    "eslint": "10.9.1",
+    "orval": "^8.26.0",
+    "prettier": "3.9.6",
+    "typescript": "^7.0.2"
+  }
+}
