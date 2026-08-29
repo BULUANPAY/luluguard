@@ -20,6 +20,15 @@ interface SignRequestBody {
   payload: JsonValue;
 }
 
+export const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
+
+export class RequestBodyTooLargeError extends Error {
+  constructor() {
+    super(`Request body exceeds ${MAX_REQUEST_BODY_BYTES} bytes`);
+    this.name = "RequestBodyTooLargeError";
+  }
+}
+
 function isJsonObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -60,11 +69,29 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-async function readRequestBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(chunk as Buffer);
+export async function readRequestBody(req: IncomingMessage): Promise<unknown> {
+  const declaredLength = Number(req.headers["content-length"]);
+  if (
+    Number.isFinite(declaredLength) &&
+    declaredLength > MAX_REQUEST_BODY_BYTES
+  ) {
+    req.resume();
+    throw new RequestBodyTooLargeError();
   }
+
+  const chunks: Buffer[] = [];
+  let receivedBytes = 0;
+  let tooLarge = false;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    receivedBytes += buffer.length;
+    if (receivedBytes > MAX_REQUEST_BODY_BYTES) {
+      tooLarge = true;
+      continue;
+    }
+    chunks.push(buffer);
+  }
+  if (tooLarge) throw new RequestBodyTooLargeError();
   const raw = Buffer.concat(chunks).toString("utf8");
   return raw ? JSON.parse(raw) : {};
 }
@@ -77,11 +104,14 @@ async function handleSign(
   let body: unknown;
   try {
     body = await readRequestBody(req);
-  } catch {
-    sendJson(res, 400, {
+  } catch (error) {
+    const tooLarge = error instanceof RequestBodyTooLargeError;
+    sendJson(res, tooLarge ? 413 : 400, {
       error: {
-        code: "INVALID_JSON",
-        message: "Request body must be valid JSON",
+        code: tooLarge ? "PAYLOAD_TOO_LARGE" : "INVALID_JSON",
+        message: tooLarge
+          ? `Request body must not exceed ${MAX_REQUEST_BODY_BYTES} bytes`
+          : "Request body must be valid JSON",
       },
     });
     return;
