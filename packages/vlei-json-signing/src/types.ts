@@ -17,7 +17,7 @@ export interface AuthorizedSigner extends SignerInfo {
 }
 
 export interface ProtectedSignature {
-  v: "VLEIJSON10";
+  v: "VLEIJSON-1.0";
   payloadDigest: string;
   lei: string;
   signerAid: string;
@@ -26,7 +26,7 @@ export interface ProtectedSignature {
 }
 
 export interface SignedJsonEnvelope<T extends JsonValue = JsonValue> {
-  v: "VLEIJSON10";
+  v: "VLEIJSON-1.0";
   payload: T;
   protected: ProtectedSignature;
   signature: string;

@@ -99,10 +99,10 @@ if (result.valid) {
 
 ```json
 {
-  "v": "VLEIJSON10",
+  "v": "VLEIJSON-1.0",
   "payload": { "orderId": "ORD-001", "amount": 1000 },
   "protected": {
-    "v": "VLEIJSON10",
+    "v": "VLEIJSON-1.0",
     "payloadDigest": "F...",
     "lei": "8755001ELOZEL05BVX22",
     "signerAid": "F...",

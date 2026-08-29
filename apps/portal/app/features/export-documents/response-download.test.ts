@@ -16,7 +16,7 @@ describe("signed response download", () => {
       () => 0.2,
     );
     const envelope: SignedExportDocumentEnvelope = {
-      v: "VLEIJSON10",
+      v: "VLEIJSON-1.0",
       payload,
       protected: {
         payloadDigest: "digest",

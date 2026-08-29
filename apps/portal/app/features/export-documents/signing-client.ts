@@ -3,7 +3,7 @@ import type { ExportDocument } from "./export-document";
 export const DEMO_SIGNING_LEI = "8755001ELOZEL05BVX22";
 
 export interface SignedExportDocumentEnvelope {
-  v: "VLEIJSON10";
+  v: "VLEIJSON-1.0";
   payload: ExportDocument;
   protected: {
     payloadDigest: string;

@@ -14,7 +14,7 @@ import tempfile
 
 
 STATE_VERSION = 1
-ENVELOPE_VERSION = "VLEIJSON10"
+ENVELOPE_VERSION = "VLEIJSON-1.0"
 REGISTRY_NAME = "jsonSignerRegistry"
 STATE_FILE = "state.json"
 LOCK_FILE = "state.lock"

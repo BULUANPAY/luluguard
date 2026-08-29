@@ -17,7 +17,7 @@ describe("vLEI signing client", () => {
         capturedInit = init;
         return new Response(
           JSON.stringify({
-            v: "VLEIJSON10",
+            v: "VLEIJSON-1.0",
             payload: document,
             protected: {
               payloadDigest: "digest",

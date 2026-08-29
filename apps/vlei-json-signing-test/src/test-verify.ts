@@ -3,12 +3,12 @@ import { VleiJsonSigning } from "@repo/vlei-json-signing";
 const EXPECTED_ROOT_AID = "FCIErP8b3nCca-rMn5LW4Tf2GzfUB67pdc5OjrhpMWkT";
 
 const envelope = JSON.parse(`{
-    "v": "VLEIJSON10",
+    "v": "VLEIJSON-1.0",
     "payload": {
         "message": "Hello, world!"
     },
     "protected": {
-        "v": "VLEIJSON10",
+        "v": "VLEIJSON-1.0",
         "payloadDigest": "FNEHziMvVRMx-eISG8ly6qiU_82QIScHOddm_OgS0Fbv",
         "lei": "8755001ELOZEL05BVX22",
         "signerAid": "FAOrOTz-3P8q-GORnzN7gTJhYVv2a23gQPs98u56aKX8",
