@@ -15,7 +15,7 @@ export const exportObjectFormSchema = z.object({
   consigneeCountry: z.string().trim().min(2, "請填寫目的國"),
   invoiceNo: z.string().trim().min(1, "請填寫發票號碼"),
   incoterm: z.enum(["EXW", "FOB", "CIF", "CPT", "DAP", "DDP"]),
-  currency: z.enum(["USD", "TWD", "JPY", "EUR"]),
+  currency: z.enum(["USD", "TWD", "JPY"]),
   totalValue: z.number().positive("金額必須大於 0"),
   originCountry: z.string().trim().min(2, "請填寫原產國"),
   destinationPort: z.string().trim().min(2, "請填寫目的港"),
@@ -63,10 +63,10 @@ export interface ExportObjectPayload {
 }
 
 const goodsCatalog = [
-  { description: "Scottish White Unicorn", hsCode: "010121" },
-  { description: "Highland Silver-Mane Unicorn", hsCode: "010121" },
-  { description: "Golden Foal Unicorn", hsCode: "010121" },
-  { description: "Moonlit Forest Unicorn", hsCode: "010121" },
+  { description: "Highland Pony", hsCode: "010121" },
+  { description: "Connemara Pony", hsCode: "010121" },
+  { description: "Fell Pony", hsCode: "010121" },
+  { description: "Shetland Pony", hsCode: "010121" },
 ] as const;
 
 export function createRandomExportGoodsItem(
@@ -89,10 +89,10 @@ export function createRandomExportObject(
   random: () => number = Math.random,
 ): ExportObjectFormValues {
   const destinations = [
-    { consignee: "Taiwan Magical Creature Sanctuary", country: "TW", port: "Kaohsiung, TW" },
-    { consignee: "Mahoutokoro Unicorn Preserve", country: "JP", port: "Yokohama, JP" },
-    { consignee: "Black Forest Magical Menagerie", country: "DE", port: "Hamburg, DE" },
-    { consignee: "New Salem Unicorn Reserve", country: "US", port: "New York, US" },
+    { consignee: "Kaohsiung Livestock Import Center", country: "TW", port: "Kaohsiung, TW" },
+    { consignee: "Yokohama Equine Import Association", country: "JP", port: "Yokohama, JP" },
+    { consignee: "Black Forest Animal Import GmbH", country: "DE", port: "Hamburg, DE" },
+    { consignee: "New Salem Livestock Import Co.", country: "US", port: "New York, US" },
   ] as const;
   const destination = pick(destinations, random);
   const departureDate = new Date(now);
@@ -106,7 +106,7 @@ export function createRandomExportObject(
     consigneeCountry: destination.country,
     invoiceNo: `INV-${now.getFullYear()}-${randomInteger(10000, 99999, random)}`,
     incoterm: pick(["FOB", "CIF", "CPT", "DAP"] as const, random),
-    currency: pick(["USD", "JPY", "EUR"] as const, random),
+    currency: pick(["USD", "JPY"] as const, random),
     totalValue: randomInteger(25_000, 300_000, random),
     originCountry: "GB",
     destinationPort: destination.port,

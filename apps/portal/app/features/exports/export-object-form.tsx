@@ -74,7 +74,7 @@ export function ExportObjectForm({
         </Field>
         <Field error={errors.currency?.message} label="幣別">
           <select className={selectClassName} {...register("currency")}>
-            {['USD', 'TWD', 'JPY', 'EUR'].map((value) => <option key={value}>{value}</option>)}
+            {['USD', 'TWD', 'JPY'].map((value) => <option key={value}>{value}</option>)}
           </select>
         </Field>
         <Field error={errors.totalValue?.message} label="發票總額">

@@ -34,10 +34,10 @@ export function getMockExportDocuments(
     .slice(0, 10)
     .toUpperCase();
   return {
-    invoiceNumber: hasInvoice ? `GB-HPMS-${externalReference}-2026` : "",
+    invoiceNumber: hasInvoice ? `GB-SLE-${externalReference}-2026` : "",
     invoiceDate: hasInvoice ? "2026-08-20" : undefined,
-    exporter: hasInvoice ? "哈利波特怪物商" : "",
-    importer: hasInvoice ? "Taiwan Magical Creature Sanctuary" : "",
+    exporter: hasInvoice ? "Sinclair Livestock Exports Ltd." : "",
+    importer: hasInvoice ? "Kaohsiung Livestock Import Center" : "",
     originCountry: "GB",
     destinationCountry: "TW",
     currency: "USD",
@@ -47,16 +47,16 @@ export function getMockExportDocuments(
     packageCount: hasPackingList ? 1 : undefined,
     grossWeightKg: hasPackingList ? 460 : undefined,
     netWeightKg: hasPackingList ? 420 : undefined,
-    billOfLadingNumber: hasBillOfLading ? `HPMSGB${externalReference}` : undefined,
+    billOfLadingNumber: hasBillOfLading ? `SLEGB${externalReference}` : undefined,
     certificateOfOriginNumber: hasOrigin ? `COO-GB-${externalReference}` : undefined,
     importPermitNumber: hasPermit ? `MOEA-${externalReference}` : undefined,
     providedDocuments: [...selected],
     items: hasInvoice ? [
       {
-        description: "Scottish White Unicorn",
-        model: "Equus unicornis",
-        material: "Live magical creature",
-        intendedUse: "Conservation breeding at a licensed magical creature sanctuary",
+        description: "Highland Pony",
+        model: "Equus ferus caballus",
+        material: "Live animal - equine",
+        intendedUse: "Breeding stock for a licensed livestock import center",
         quantity: 1,
         unitPriceUsd: 25_000,
         hsCode: "0101.21"

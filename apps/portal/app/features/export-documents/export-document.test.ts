@@ -9,7 +9,7 @@ describe("export document helpers", () => {
   it("creates a commercial invoice with internally consistent totals", () => {
     const document = createRandomExportDocument(
       "COMMERCIAL_INVOICE",
-      "哈利波特怪物商",
+      "Sinclair Livestock Exports Ltd.",
       new Date(2026, 7, 29, 10, 30),
       () => 0.25,
     );
@@ -17,8 +17,8 @@ describe("export document helpers", () => {
     expect(document.document_type).toBe("COMMERCIAL_INVOICE");
     if (document.document_type !== "COMMERCIAL_INVOICE")
       throw new Error("unexpected type");
-    expect(document.exporter.name).toBe("哈利波特怪物商");
-    expect(document.issuer.organization).toBe("哈利波特怪物商");
+    expect(document.exporter.name).toBe("Sinclair Livestock Exports Ltd.");
+    expect(document.issuer.organization).toBe("Sinclair Livestock Exports Ltd.");
     expect(document.items[0]?.amount).toBe(
       document.items[0]!.quantity * document.items[0]!.unit_price,
     );
@@ -28,7 +28,7 @@ describe("export document helpers", () => {
   it("creates a packing list whose quantities and weights are consistent", () => {
     const document = createRandomExportDocument(
       "PACKING_LIST",
-      "哈利波特怪物商",
+      "Sinclair Livestock Exports Ltd.",
       new Date(2026, 7, 29, 10, 30),
       () => 0.5,
     );
@@ -44,7 +44,7 @@ describe("export document helpers", () => {
   });
 
   it("rejects JSON whose type does not match the selected generator", () => {
-    const document = createRandomExportDocument("PACKING_LIST", "哈利波特怪物商");
+    const document = createRandomExportDocument("PACKING_LIST", "Sinclair Livestock Exports Ltd.");
 
     expect(() =>
       parseExportDocument(JSON.stringify(document), "COMMERCIAL_INVOICE"),

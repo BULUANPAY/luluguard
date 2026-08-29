@@ -50,7 +50,7 @@ interface ExportDocumentBase {
 
 export interface CommercialInvoice extends ExportDocumentBase {
   document_type: "COMMERCIAL_INVOICE";
-  currency: "USD" | "EUR" | "GBP";
+  currency: "USD" | "GBP";
   shipment: ShipmentDetails & { incoterm: string };
   items: Array<{
     line_no: number;
@@ -104,46 +104,46 @@ const exporters = [
   {
     country: "United Kingdom",
     region: "Scotland",
-    address: "1 Forbidden Forest Road, Hogsmeade, Scotland, United Kingdom",
-    vlei: "LEI-DEMO-HARRY-POTTER-MONSTERS-001",
-    signatory: "Harry Potter",
-    role: "Chief Magical Creature Exporter",
-    credential: "vLEI-DEMO-SIGNATORY-HPMS-001",
-    vessel: "MV Expecto Patronum",
+    address: "12 Glenmore Industrial Estate, Inverness, Scotland, United Kingdom",
+    vlei: "LEI-DEMO-SINCLAIR-LIVESTOCK-001",
+    signatory: "James Sinclair",
+    role: "Export Compliance Manager",
+    credential: "vLEI-DEMO-SIGNATORY-SLE-001",
+    vessel: "MV Caledonian Voyager",
   },
 ] as const;
 
 const importers = [
   {
-    name: "Taiwan Magical Creature Sanctuary",
+    name: "Kaohsiung Livestock Import Center",
     country: "Taiwan",
-    address: "No. 9, Phoenix Road, Kaohsiung, Taiwan",
-    vlei: "LEI-DEMO-MAGICAL-SANCTUARY-TW-001",
+    address: "No. 9, Harbor Road, Kaohsiung, Taiwan",
+    vlei: "LEI-DEMO-LIVESTOCK-TW-001",
     destination: "Port of Kaohsiung, Taiwan",
   },
   {
-    name: "Mahoutokoro Unicorn Preserve",
+    name: "Yokohama Equine Import Association",
     country: "Japan",
-    address: "7 Mooncalf Lane, Minami Iwo Jima, Japan",
-    vlei: "LEI-DEMO-MAHOUTOKORO-JP-002",
+    address: "7 Sakura Lane, Yokohama, Japan",
+    vlei: "LEI-DEMO-EQUINE-JP-002",
     destination: "Port of Yokohama, Japan",
   },
 ] as const;
 
 const products = [
   {
-    description: "Scottish White Unicorn",
-    scientificName: "Equus unicornis",
+    description: "Highland Pony",
+    scientificName: "Equus ferus caballus",
     hsCode: "0101.21",
   },
   {
-    description: "Highland Silver Unicorn",
-    scientificName: "Equus unicornis argenteus",
+    description: "Connemara Pony",
+    scientificName: "Equus ferus caballus",
     hsCode: "0101.21",
   },
   {
-    description: "Aurora Mane Unicorn",
-    scientificName: "Equus unicornis borealis",
+    description: "Fell Pony",
+    scientificName: "Equus ferus caballus",
     hsCode: "0101.21",
   },
 ] as const;
@@ -169,7 +169,7 @@ export function createRandomExportDocument(
   const dateStamp = documentDate.replaceAll("-", "");
   const serial = randomInteger(100, 999, random);
   const invoiceId = `INV-UNI-${dateStamp}-${serial}`;
-  const batchId = `DPP-UNICORN-${exporterProfile.region.slice(0, 3).toUpperCase()}-${dateStamp}-${serial}`;
+  const batchId = `DPP-EQUUS-${exporterProfile.region.slice(0, 3).toUpperCase()}-${dateStamp}-${serial}`;
   const signedAt = toSignedAt(now);
 
   const common = {
@@ -214,7 +214,7 @@ export function createRandomExportDocument(
   };
 
   if (documentType === "COMMERCIAL_INVOICE") {
-    const currency = pick(["USD", "EUR", "GBP"] as const, random);
+    const currency = pick(["USD", "GBP"] as const, random);
     return {
       ...common,
       document_type: "COMMERCIAL_INVOICE",
@@ -248,7 +248,7 @@ export function createRandomExportDocument(
     document_id: `PL-UNI-${dateStamp}-${serial}`,
     related_invoice: invoiceId,
     packages: {
-      package_type: "Magical Livestock Container",
+      package_type: "Livestock Transport Container",
       total_packages: totalPackages,
       heads_per_package: headsPerPackage,
       total_quantity: quantity,
@@ -270,7 +270,7 @@ export function createRandomExportDocument(
     },
     marks_and_numbers: {
       mark: exporterName.split(" ").slice(0, 2).join(" ").toUpperCase(),
-      range: `UNICORN-00001 ~ UNICORN-${String(quantity).padStart(5, "0")}`,
+        range: `LOT-00001 ~ LOT-${String(quantity).padStart(5, "0")}`,
     },
   };
 }

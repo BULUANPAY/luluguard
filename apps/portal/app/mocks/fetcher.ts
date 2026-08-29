@@ -35,7 +35,7 @@ export const mockApiFetch: ApiFetcher = async <T>(
     const body = JSON.parse(String(init.body ?? "{}")) as { reference?: string };
     return {
       accepted: true,
-      reference: body.reference ?? "未命名出口物件",
+      reference: body.reference ?? "Untitled export object",
       submittedAt: new Date().toISOString(),
     } as T;
   }
