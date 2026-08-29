@@ -205,6 +205,37 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  apps/vlei-json-verify-mcp:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0(zod@3.25.76)
+      '@repo/vlei-json-signing':
+        specifier: workspace:*
+        version: link:../../packages/vlei-json-signing
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      eslint:
+        specifier: ^10.0.0
+        version: 10.9.1(jiti@2.7.0)
+      tsx:
+        specifier: ^4.20.5
+        version: 4.20.5
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   apps/web:
     dependencies:
       '@google/genai':
