@@ -102,54 +102,31 @@ export type ExportDocument = CommercialInvoice | PackingList;
 
 const exporters = [
   {
-    name: "Highland Unicorn Export Ltd.",
     country: "United Kingdom",
     region: "Scotland",
-    address: "88 Rainbow Glen, Edinburgh, Scotland, United Kingdom",
-    vlei: "LEI-DEMO-HIGHLAND-001",
-    signatory: "Dr. Fiona MacRainbow",
-    role: "Head of Unicorn Exports",
-    credential: "vLEI-DEMO-SIGNATORY-SCT-001",
-    vessel: "MV Rainbow Express",
-  },
-  {
-    name: "Emerald Unicorn Trading plc",
-    country: "Ireland",
-    region: "Connacht",
-    address: "17 Clover Meadow, Galway, Ireland",
-    vlei: "LEI-DEMO-EMERALD-002",
-    signatory: "Ms. Aoife Silvermane",
-    role: "International Trade Director",
-    credential: "vLEI-DEMO-SIGNATORY-IRL-002",
-    vessel: "MV Emerald Comet",
-  },
-  {
-    name: "Nordic Aurora Unicorn AS",
-    country: "Norway",
-    region: "Vestland",
-    address: "42 Aurora Fjord, Bergen, Norway",
-    vlei: "LEI-DEMO-AURORA-003",
-    signatory: "Mr. Lars Moonhoof",
-    role: "Chief Export Officer",
-    credential: "vLEI-DEMO-SIGNATORY-NOR-003",
-    vessel: "MV Northern Star",
+    address: "1 Forbidden Forest Road, Hogsmeade, Scotland, United Kingdom",
+    vlei: "LEI-DEMO-HARRY-POTTER-MONSTERS-001",
+    signatory: "Harry Potter",
+    role: "Chief Magical Creature Exporter",
+    credential: "vLEI-DEMO-SIGNATORY-HPMS-001",
+    vessel: "MV Expecto Patronum",
   },
 ] as const;
 
 const importers = [
   {
-    name: "海岳國際貿易",
+    name: "Taiwan Magical Creature Sanctuary",
     country: "Taiwan",
-    address: "No. 100, Fantasy Rd., Taipei, Taiwan",
-    vlei: "LEI-DEMO-UNICORN-TW-001",
-    destination: "Port of Keelung, Taiwan",
+    address: "No. 9, Phoenix Road, Kaohsiung, Taiwan",
+    vlei: "LEI-DEMO-MAGICAL-SANCTUARY-TW-001",
+    destination: "Port of Kaohsiung, Taiwan",
   },
   {
-    name: "Pacific Wonder Imports Co., Ltd.",
-    country: "Taiwan",
-    address: "No. 25, Harbor Rd., Kaohsiung, Taiwan",
-    vlei: "LEI-DEMO-WONDER-TW-002",
-    destination: "Port of Kaohsiung, Taiwan",
+    name: "Mahoutokoro Unicorn Preserve",
+    country: "Japan",
+    address: "7 Mooncalf Lane, Minami Iwo Jima, Japan",
+    vlei: "LEI-DEMO-MAHOUTOKORO-JP-002",
+    destination: "Port of Yokohama, Japan",
   },
 ] as const;
 
@@ -180,10 +157,10 @@ export function createRandomExportDocument(
   const exporterProfile = pick(exporters, random);
   const importer = pick(importers, random);
   const product = pick(products, random);
-  const quantity = randomInteger(50, 200, random) * 100;
-  const headsPerPackage = pick([50, 100, 200] as const, random);
+  const quantity = randomInteger(1, 5, random);
+  const headsPerPackage = 1;
   const totalPackages = Math.ceil(quantity / headsPerPackage);
-  const unitPrice = randomInteger(12, 32, random) * 100;
+  const unitPrice = randomInteger(25, 60, random) * 1_000;
   const totalAmount = quantity * unitPrice;
   const netWeight = quantity * randomInteger(380, 460, random);
   const grossWeight =

@@ -8,7 +8,7 @@ import { ExportObjectForm } from "./export-object-form";
 describe("ExportObjectForm", () => {
   it("submits the randomized default values for JSON preview", async () => {
     const values = createRandomExportObject(
-      "森沐實業",
+      "哈利波特怪物商",
       new Date("2026-08-29"),
       () => 0.4,
     );
@@ -31,7 +31,7 @@ describe("ExportObjectForm", () => {
 
   it("validates and submits the current values", async () => {
     const values = createRandomExportObject(
-      "森沐實業",
+      "哈利波特怪物商",
       new Date("2026-08-29"),
       () => 0.4,
     );
@@ -54,7 +54,7 @@ describe("ExportObjectForm", () => {
 
   it("adds another randomized goods item", async () => {
     const values = createRandomExportObject(
-      "森沐實業",
+      "哈利波特怪物商",
       new Date("2026-08-29"),
       () => 0.4,
     );

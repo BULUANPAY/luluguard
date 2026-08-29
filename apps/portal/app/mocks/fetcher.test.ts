@@ -6,15 +6,15 @@ import { mockApiFetch } from "./fetcher";
 describe("development API adapter", () => {
   it("returns the current session", async () => {
     const session = await mockApiFetch<Session>("/session", { method: "GET" });
-    expect(session.activeOrganization.kind).toBe("importer");
+    expect(session.activeOrganization.kind).toBe("exporter");
   });
 
   it("filters shipments by search text", async () => {
-    const shipments = await mockApiFetch<Shipment[]>("/shipments?search=Busan", {
+    const shipments = await mockApiFetch<Shipment[]>("/shipments?search=Yokohama", {
       method: "GET",
     });
     expect(shipments).toHaveLength(1);
-    expect(shipments[0]?.origin).toContain("Busan");
+    expect(shipments[0]?.destination).toContain("Yokohama");
   });
 
   it("accepts an export object submission", async () => {

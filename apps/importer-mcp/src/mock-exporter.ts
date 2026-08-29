@@ -34,32 +34,32 @@ export function getMockExportDocuments(
     .slice(0, 10)
     .toUpperCase();
   return {
-    invoiceNumber: hasInvoice ? `JP-TKY-${externalReference}-2026` : "",
+    invoiceNumber: hasInvoice ? `GB-HPMS-${externalReference}-2026` : "",
     invoiceDate: hasInvoice ? "2026-08-20" : undefined,
-    exporter: hasInvoice ? "Tokyo Precision Instruments Co., Ltd." : "",
-    importer: hasInvoice ? "Formosa Industrial Systems Co., Ltd." : "",
-    originCountry: "JP",
+    exporter: hasInvoice ? "哈利波特怪物商" : "",
+    importer: hasInvoice ? "Taiwan Magical Creature Sanctuary" : "",
+    originCountry: "GB",
     destinationCountry: "TW",
     currency: "USD",
     incoterm: hasInvoice ? "CIF" : undefined,
-    freightUsd: hasInvoice ? 80 : undefined,
-    insuranceUsd: hasInvoice ? 12 : undefined,
-    packageCount: hasPackingList ? 2 : undefined,
-    grossWeightKg: hasPackingList ? 18.4 : undefined,
-    netWeightKg: hasPackingList ? 15.2 : undefined,
-    billOfLadingNumber: hasBillOfLading ? `ONEYTYO${externalReference}` : undefined,
-    certificateOfOriginNumber: hasOrigin ? `COO-JP-${externalReference}` : undefined,
+    freightUsd: hasInvoice ? 2_400 : undefined,
+    insuranceUsd: hasInvoice ? 850 : undefined,
+    packageCount: hasPackingList ? 1 : undefined,
+    grossWeightKg: hasPackingList ? 460 : undefined,
+    netWeightKg: hasPackingList ? 420 : undefined,
+    billOfLadingNumber: hasBillOfLading ? `HPMSGB${externalReference}` : undefined,
+    certificateOfOriginNumber: hasOrigin ? `COO-GB-${externalReference}` : undefined,
     importPermitNumber: hasPermit ? `MOEA-${externalReference}` : undefined,
     providedDocuments: [...selected],
     items: hasInvoice ? [
       {
-        description: "Industrial digital temperature sensors",
-        model: "TSP-500",
-        material: "Stainless-steel probe with electronic sensing module",
-        intendedUse: "Temperature monitoring in food-processing equipment",
-        quantity: 10,
-        unitPriceUsd: 120,
-        hsCode: "9025.19"
+        description: "Scottish White Unicorn",
+        model: "Equus unicornis",
+        material: "Live magical creature",
+        intendedUse: "Conservation breeding at a licensed magical creature sanctuary",
+        quantity: 1,
+        unitPriceUsd: 25_000,
+        hsCode: "0101.21"
       }
     ] : []
   };

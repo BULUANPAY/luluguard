@@ -7,7 +7,7 @@ describe("vLEI signing client", () => {
   it("wraps the export document in the signing API request", async () => {
     const document = createRandomExportDocument(
       "COMMERCIAL_INVOICE",
-      "森沐實業",
+      "哈利波特怪物商",
       new Date(2026, 7, 29),
       () => 0.2,
     );
