@@ -7,6 +7,7 @@
 
 - `VLEI_SIGNING_API_PORT`：服務監聽的埠號，預設 `3001`
 - `VLEI_ROOT_SEED`：根金鑰種子（由 `@repo/vlei-json-signing` 內部讀取）
+- `VLEI_SIGNING_ALLOWED_ORIGIN`：允許呼叫 API 的瀏覽器 origin；預設 `*`（demo 用）
 
 ## 開發
 

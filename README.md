@@ -15,12 +15,14 @@ packages/
 └── typescript-config/  Shared TypeScript configuration
 ```
 
-| Application  | Default URL                          | Purpose                         |
-| ------------ | ------------------------------------ | ------------------------------- |
-| Web          | `http://localhost:3000`              | Import workflow UI and AI chat  |
-| Policy admin | `http://localhost:3000/admin/policy` | Runtime payment-policy controls |
-| Importer MCP | `http://127.0.0.1:4020/mcp`          | Streamable HTTP MCP endpoint    |
-| MCP health   | `http://127.0.0.1:4020/health`       | Importer service health check   |
+| Application  | Default URL                          | Purpose                          |
+| ------------ | ------------------------------------ | -------------------------------- |
+| Web          | `http://localhost:3000`              | Import workflow UI and AI chat   |
+| Trade portal | `http://localhost:5173`              | Import/export document workspace |
+| vLEI signing | `http://localhost:3001`              | JSON signing API                 |
+| Policy admin | `http://localhost:3000/admin/policy` | Runtime payment-policy controls  |
+| Importer MCP | `http://127.0.0.1:4020/mcp`          | Streamable HTTP MCP endpoint     |
+| MCP health   | `http://127.0.0.1:4020/health`       | Importer service health check    |
 
 ## Requirements
 
@@ -96,6 +98,18 @@ pnpm --filter @luluguard/importer-mcp dev
 ```sh
 pnpm --filter @luluguard/web dev
 ```
+
+For the trade portal's I/V and P/L generator, start these in separate terminals:
+
+```sh
+pnpm dev:vlei-signing-api
+pnpm dev:portal
+```
+
+The portal defaults to `http://localhost:3001` for signing. Override it with
+`VITE_VLEI_SIGNING_API_URL`; set `VITE_VLEI_SIGNING_LEI` to use another valid
+ISO 17442 LEI. The signing API's browser origin can be restricted with
+`VLEI_SIGNING_ALLOWED_ORIGIN`.
 
 Confirm that the MCP server is available:
 

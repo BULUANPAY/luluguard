@@ -1,7 +1,18 @@
-import { canonicalizeJson, VleiJsonSigningError } from "@repo/vlei-json-signing";
-import type { JsonObject, JsonValue, VleiJsonSigning } from "@repo/vlei-json-signing";
+import {
+  canonicalizeJson,
+  VleiJsonSigningError,
+} from "@repo/vlei-json-signing";
+import type {
+  JsonObject,
+  JsonValue,
+  VleiJsonSigning,
+} from "@repo/vlei-json-signing";
 import { createHash } from "node:crypto";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 
 interface SignRequestBody {
   signerInfo: JsonObject;
@@ -26,12 +37,26 @@ function isSignRequestBody(value: unknown): value is SignRequestBody {
 
 // Deterministic id so identical signerInfo always resolves to the same signer.
 function deriveSignerId(info: JsonObject): string {
-  const digest = createHash("sha256").update(canonicalizeJson(info)).digest("hex");
+  const digest = createHash("sha256")
+    .update(canonicalizeJson(info))
+    .digest("hex");
   return `signer-${digest.slice(0, 32)}`;
 }
 
+function corsHeaders(): Record<string, string> {
+  return {
+    "access-control-allow-origin":
+      process.env.VLEI_SIGNING_ALLOWED_ORIGIN ?? "*",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "content-type",
+  };
+}
+
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { "content-type": "application/json" });
+  res.writeHead(status, {
+    "content-type": "application/json",
+    ...corsHeaders(),
+  });
   res.end(JSON.stringify(body));
 }
 
@@ -54,7 +79,10 @@ async function handleSign(
     body = await readRequestBody(req);
   } catch {
     sendJson(res, 400, {
-      error: { code: "INVALID_JSON", message: "Request body must be valid JSON" },
+      error: {
+        code: "INVALID_JSON",
+        message: "Request body must be valid JSON",
+      },
     });
     return;
   }
@@ -81,7 +109,9 @@ async function handleSign(
     sendJson(res, 200, { ...envelope, signerId });
   } catch (error) {
     if (error instanceof VleiJsonSigningError) {
-      sendJson(res, 400, { error: { code: error.code, message: error.message } });
+      sendJson(res, 400, {
+        error: { code: error.code, message: error.message },
+      });
       return;
     }
     sendJson(res, 500, {
@@ -95,6 +125,12 @@ async function handleSign(
 
 export function createApp(signing: VleiJsonSigning) {
   return createServer((req, res) => {
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, corsHeaders());
+      res.end();
+      return;
+    }
+
     if (req.method === "GET" && req.url === "/health") {
       sendJson(res, 200, { status: "ok" });
       return;
@@ -105,6 +141,8 @@ export function createApp(signing: VleiJsonSigning) {
       return;
     }
 
-    sendJson(res, 404, { error: { code: "NOT_FOUND", message: "Route not found" } });
+    sendJson(res, 404, {
+      error: { code: "NOT_FOUND", message: "Route not found" },
+    });
   });
 }

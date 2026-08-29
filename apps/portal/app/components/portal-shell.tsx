@@ -2,6 +2,7 @@ import { Button } from "@luluguard/ui/components/button";
 import {
   ChevronDown,
   CircleUserRound,
+  FileInput,
   FilePlus2,
   LayoutDashboard,
   LifeBuoy,
@@ -34,11 +35,20 @@ export function PortalShell({ children }: { children: ReactNode }) {
               LG
             </span>
             <span>
-              <span className="block font-display text-base font-bold tracking-tight">LuLuGuard</span>
-              <span className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50">Trade workspace</span>
+              <span className="block font-display text-base font-bold tracking-tight">
+                LuLuGuard
+              </span>
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50">
+                Trade workspace
+              </span>
             </span>
           </NavLink>
-          <Button className="text-white hover:bg-white/10 lg:hidden" size="icon" variant="ghost" aria-label="搜尋">
+          <Button
+            className="text-white hover:bg-white/10 lg:hidden"
+            size="icon"
+            variant="ghost"
+            aria-label="搜尋"
+          >
             <Search className="size-4" />
           </Button>
         </div>
@@ -64,7 +74,10 @@ export function PortalShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="mt-auto hidden px-4 pb-5 pt-8 lg:absolute lg:bottom-0 lg:block lg:w-[252px]">
-          <a className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/60 hover:bg-white/10 hover:text-white" href="mailto:support@luluguard.local">
+          <a
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/60 hover:bg-white/10 hover:text-white"
+            href="mailto:support@luluguard.local"
+          >
             <LifeBuoy className="size-4" />
             需要協助？
           </a>
@@ -92,7 +105,10 @@ export function PortalShell({ children }: { children: ReactNode }) {
               >
                 {session.organizations.map((organization) => (
                   <option key={organization.id} value={organization.id}>
-                    {formatOrganizationLabel(organization.name, organization.kind)}
+                    {formatOrganizationLabel(
+                      organization.name,
+                      organization.kind,
+                    )}
                   </option>
                 ))}
               </select>
@@ -100,13 +116,25 @@ export function PortalShell({ children }: { children: ReactNode }) {
             </label>
 
             {isExporter ? (
-              <Can permission="export-object:create">
-                <Button onClick={() => navigate("/exports/new")}>
-                  <FilePlus2 className="size-4" />
-                  <span className="hidden sm:inline">新增出口物件</span>
-                  <span className="sm:hidden">新增</span>
-                </Button>
-              </Can>
+              <>
+                <Can permission="export-object:create">
+                  <Button
+                    onClick={() => navigate("/exports/new")}
+                    variant="outline"
+                  >
+                    <FilePlus2 className="size-4" />
+                    <span className="hidden sm:inline">新增出口物件</span>
+                    <span className="sm:hidden">物件</span>
+                  </Button>
+                </Can>
+                <Can permission="document:upload">
+                  <Button onClick={() => navigate("/exports/documents/new")}>
+                    <FileInput className="size-4" />
+                    <span className="hidden sm:inline">產生 I/V、P/L</span>
+                    <span className="sm:hidden">文件</span>
+                  </Button>
+                </Can>
+              </>
             ) : (
               <Can permission="shipment:create">
                 <Button>
@@ -120,8 +148,12 @@ export function PortalShell({ children }: { children: ReactNode }) {
             <div className="ml-1 flex items-center gap-2 border-l border-border pl-3">
               <CircleUserRound className="size-8 text-muted-foreground" />
               <span className="hidden text-left lg:block">
-                <span className="block text-sm font-semibold leading-tight">{session.user.name}</span>
-                <span className="block text-xs text-muted-foreground">營運管理員</span>
+                <span className="block text-sm font-semibold leading-tight">
+                  {session.user.name}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  營運管理員
+                </span>
               </span>
             </div>
           </div>
