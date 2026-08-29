@@ -1,0 +1,3 @@
+[submodule "vendor/vlei-sandbox"]
+	path = vendor/vlei-sandbox
+	url = https://github.com/smpebble/vlei-sandbox.git

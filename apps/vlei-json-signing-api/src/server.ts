@@ -1,0 +1,110 @@
+import { canonicalizeJson, VleiJsonSigningError } from "@repo/vlei-json-signing";
+import type { JsonObject, JsonValue, VleiJsonSigning } from "@repo/vlei-json-signing";
+import { createHash } from "node:crypto";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+
+interface SignRequestBody {
+  signerInfo: JsonObject;
+  lei: string;
+  payload: JsonValue;
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isSignRequestBody(value: unknown): value is SignRequestBody {
+  if (!isJsonObject(value)) {
+    return false;
+  }
+  return (
+    isJsonObject(value.signerInfo) &&
+    typeof value.lei === "string" &&
+    "payload" in value
+  );
+}
+
+// Deterministic id so identical signerInfo always resolves to the same signer.
+function deriveSignerId(info: JsonObject): string {
+  const digest = createHash("sha256").update(canonicalizeJson(info)).digest("hex");
+  return `signer-${digest.slice(0, 32)}`;
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { "content-type": "application/json" });
+  res.end(JSON.stringify(body));
+}
+
+async function readRequestBody(req: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(chunk as Buffer);
+  }
+  const raw = Buffer.concat(chunks).toString("utf8");
+  return raw ? JSON.parse(raw) : {};
+}
+
+async function handleSign(
+  req: IncomingMessage,
+  res: ServerResponse,
+  signing: VleiJsonSigning,
+): Promise<void> {
+  let body: unknown;
+  try {
+    body = await readRequestBody(req);
+  } catch {
+    sendJson(res, 400, {
+      error: { code: "INVALID_JSON", message: "Request body must be valid JSON" },
+    });
+    return;
+  }
+
+  if (!isSignRequestBody(body)) {
+    sendJson(res, 400, {
+      error: {
+        code: "INVALID_REQUEST",
+        message: "Body must include signerInfo, lei, and payload",
+      },
+    });
+    return;
+  }
+
+  try {
+    const signerId = deriveSignerId(body.signerInfo);
+    // Idempotent: registers the signer on first use, reuses it on subsequent calls with matching info.
+    await signing.createSigner({ id: signerId, info: body.signerInfo });
+    const envelope = await signing.signJson({
+      signerId,
+      lei: body.lei,
+      payload: body.payload,
+    });
+    sendJson(res, 200, { ...envelope, signerId });
+  } catch (error) {
+    if (error instanceof VleiJsonSigningError) {
+      sendJson(res, 400, { error: { code: error.code, message: error.message } });
+      return;
+    }
+    sendJson(res, 500, {
+      error: {
+        code: "INTERNAL_ERROR",
+        message: error instanceof Error ? error.message : "Unexpected error",
+      },
+    });
+  }
+}
+
+export function createApp(signing: VleiJsonSigning) {
+  return createServer((req, res) => {
+    if (req.method === "GET" && req.url === "/health") {
+      sendJson(res, 200, { status: "ok" });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/sign") {
+      void handleSign(req, res, signing);
+      return;
+    }
+
+    sendJson(res, 404, { error: { code: "NOT_FOUND", message: "Route not found" } });
+  });
+}
