@@ -6,7 +6,7 @@ import { mockApiFetch } from "./fetcher";
 describe("development API adapter", () => {
   it("returns the current session", async () => {
     const session = await mockApiFetch<Session>("/session", { method: "GET" });
-    expect(session.activeOrganization.kind).toBe("importer");
+    expect(session.activeOrganization.kind).toBe("exporter");
   });
 
   it("filters shipments by search text", async () => {

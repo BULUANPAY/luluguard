@@ -7,12 +7,11 @@ export const sessionFixture: Session = {
     email: "pinyu@example.com",
   },
   activeOrganization: {
-    id: "org-importer",
-    name: "海岳國際貿易",
-    kind: "importer",
+    id: "org-exporter",
+    name: "森沐實業",
+    kind: "exporter",
   },
   organizations: [
-    { id: "org-importer", name: "海岳國際貿易", kind: "importer" },
     { id: "org-exporter", name: "森沐實業", kind: "exporter" },
     { id: "org-broker", name: "迅捷報關行", kind: "customs-broker" },
   ],

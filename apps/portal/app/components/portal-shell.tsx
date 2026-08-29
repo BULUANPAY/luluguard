@@ -166,10 +166,8 @@ export function PortalShell({ children }: { children: ReactNode }) {
 }
 
 const organizationKindLabels: Record<string, string> = {
-  importer: "進口商",
   exporter: "出口商",
   "customs-broker": "報關行",
-  government: "政府",
 };
 
 function formatOrganizationLabel(name: string, kind: string) {
