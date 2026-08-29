@@ -1,13 +1,19 @@
 import { config as loadEnv } from "dotenv";
-import { resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 
-loadEnv({ path: resolve(import.meta.dirname, "../../../.env"), override: false, quiet: true });
+const moduleParent = dirname(import.meta.dirname);
+const appRoot = basename(moduleParent) === "dist" ? dirname(moduleParent) : moduleParent;
+
+loadEnv({ path: resolve(appRoot, ".env"), override: false, quiet: true });
 
 export const config = {
   mcp: {
     host: process.env.MCP_HOST ?? "127.0.0.1",
     port: Number(process.env.MCP_PORT ?? 4020),
     apiKey: process.env.MCP_API_KEY ?? ""
+  },
+  policyAdmin: {
+    apiKey: process.env.POLICY_ADMIN_API_KEY ?? ""
   },
   customsBroker: {
     apiUrl: process.env.CUSTOMS_BROKER_API_URL ?? "http://127.0.0.1:4021",
@@ -18,8 +24,18 @@ export const config = {
     address: process.env.IMPORTER_ADDRESS ?? "",
     privateKey: process.env.IMPORTER_PRIVATE_KEY ?? ""
   },
+  signer: {
+    provider: process.env.SIGNER_PROVIDER ?? "private-key",
+    awsKms: {
+      keyId: process.env.AWS_KMS_KEY_ID ?? "",
+      region: process.env.AWS_REGION ?? "",
+      endpoint: process.env.AWS_KMS_ENDPOINT
+    }
+  },
   payment: {
     maxUsdc: Number(process.env.MAX_PAYMENT_USDC ?? 1),
+    maxDailyUsdc: Number(process.env.MAX_DAILY_PAYMENT_USDC ?? 5),
+    maxPaymentsPerHour: Number(process.env.MAX_PAYMENTS_PER_HOUR ?? 5),
     humanApprovalAboveUsdc: Number(process.env.HUMAN_APPROVAL_ABOVE_USDC ?? 0)
   },
   x402: {

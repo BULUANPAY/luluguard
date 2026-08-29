@@ -6,8 +6,8 @@ import { config } from "../config.js";
 import { isAllowedPayee } from "./policy.js";
 import { createImporterSigner } from "./signer.js";
 
-export function createX402PaidFetch(): typeof globalThis.fetch {
-  const { account, brokerAddress } = createImporterSigner();
+export async function createX402PaidFetch(): Promise<typeof globalThis.fetch> {
+  const { account, brokerAddress } = await createImporterSigner();
   const client = new x402Client().setSpendControls({
     maxAmountPerPayment: `$${config.payment.maxUsdc}` as Money
   });

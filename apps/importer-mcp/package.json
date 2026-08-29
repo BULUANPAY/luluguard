@@ -12,7 +12,9 @@
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-kms": "^3.1119.0",
     "@modelcontextprotocol/sdk": "^1.17.3",
+    "@noble/curves": "^1.9.7",
     "@x402/core": "^2.23.0",
     "@x402/evm": "^2.23.0",
     "@x402/fetch": "^2.23.0",

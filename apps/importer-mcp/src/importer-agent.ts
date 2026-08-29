@@ -1,17 +1,52 @@
+import { randomUUID } from "node:crypto";
 import { decodePaymentResponseHeader } from "@x402/fetch";
-import type { AgentPolicy, CustomsBrokerReceipt, CustomsBrokerResponse, CustomsQuoteResponse, DutyQuote, ExportDocuments } from "./domain.js";
-import { getMockExportDocuments } from "./mock-exporter.js";
+import type {
+  AgentPolicy,
+  CustomsBrokerReceipt,
+  CustomsBrokerResponse,
+  CustomsQuoteResponse,
+  DutyQuote,
+  ExportDocuments,
+  TradeDocumentType
+} from "./domain.js";
+import { defaultMockDocumentTypes, getMockExportDocuments } from "./mock-exporter.js";
 import { log } from "./logger.js";
-import { assertPaymentAllowed } from "./payment/policy.js";
+import {
+  assertPaymentAllowed,
+  PaymentPolicyError,
+  type PaymentPolicyDecision,
+  type PaymentRecord
+} from "./payment/policy.js";
+import { reviewImportQuote, type ComplianceReview } from "./compliance-review.js";
+import { reviewDocumentsBeforeTransmission, type DocumentReview } from "./document-review.js";
+import { estimateImportCosts, type ImportEstimate } from "./import-estimate.js";
 
-export interface QuoteResult {
+export interface PreflightResult {
+  preflightId: string;
   orderId: string;
   documents: ExportDocuments;
+  documentReview: DocumentReview;
+  independentEstimate?: ImportEstimate;
+  readyForBroker: boolean;
+  transmittedToBroker: false;
+  audit: string[];
+}
+
+export interface QuoteResult {
+  preflightId: string;
+  orderId: string;
+  documents: ExportDocuments;
+  documentReview: DocumentReview;
+  independentEstimate: ImportEstimate;
+  estimateApproved: true;
+  transmittedToBroker: true;
   quote: DutyQuote;
+  complianceReview: ComplianceReview;
   audit: string[];
 }
 
 export interface SubmissionResult extends QuoteResult {
+  paymentPolicyDecision: PaymentPolicyDecision;
   receipt: CustomsBrokerReceipt;
   settlement?: unknown;
 }
@@ -24,16 +59,61 @@ export class ImporterAgent {
     private readonly paidFetch: typeof globalThis.fetch,
     private readonly brokerFeeUsd: number,
     private readonly brokerAddress: string,
-    private readonly importerAddress: string
+    private readonly importerAddress: string,
+    private readonly preflightStore = new Map<string, PreflightResult>(),
+    private readonly quoteStore = new Map<string, QuoteResult>(),
+    private readonly paymentHistory: PaymentRecord[] = []
   ) {}
 
-  async getQuote(orderId: string): Promise<QuoteResult> {
+  precheck(
+    orderId: string,
+    selectedDocuments: TradeDocumentType[] = defaultMockDocumentTypes
+  ): PreflightResult {
     const audit: string[] = [];
-    log("info", "importer-agent", "quote.started", { orderId });
-    const documents = getMockExportDocuments(orderId);
-    audit.push(`Fetched export documents for ${documents.invoiceNumber}`);
+    const preflightId = `PREFLIGHT-${randomUUID()}`;
+    log("info", "importer-agent", "preflight.started", { orderId, selectedDocuments });
+    const documents = getMockExportDocuments(orderId, selectedDocuments);
+    audit.push("Fetched selected mock export documents locally");
+    const documentReview = reviewDocumentsBeforeTransmission(documents);
+    audit.push(`Document review completed; readyToTransmit=${documentReview.readyToTransmit}`);
+    const independentEstimate = documentReview.readyToTransmit
+      ? estimateImportCosts(documents, this.brokerFeeUsd)
+      : undefined;
+    if (independentEstimate) audit.push("Generated independent importer estimate; broker was not contacted");
+    const result: PreflightResult = {
+      preflightId,
+      orderId,
+      documents,
+      documentReview,
+      independentEstimate,
+      readyForBroker: documentReview.readyToTransmit,
+      transmittedToBroker: false,
+      audit
+    };
+    this.preflightStore.set(preflightId, result);
+    log(documentReview.readyToTransmit ? "info" : "warn", "importer-agent", "preflight.completed", {
+      orderId,
+      preflightId,
+      readyForBroker: result.readyForBroker,
+      estimatedTotalUsd: independentEstimate?.estimatedTotalUsd,
+      transmittedToBroker: false
+    });
+    return result;
+  }
+
+  async getQuote(preflightId: string, estimateApproved: boolean): Promise<QuoteResult> {
+    const preflight = this.preflightStore.get(preflightId);
+    if (!preflight) throw new Error("A valid importer preflight is required before broker quotation");
+    if (!preflight.readyForBroker || !preflight.independentEstimate) {
+      throw new Error("Document review must pass before broker quotation");
+    }
+    if (!estimateApproved) {
+      throw new Error("The user must confirm the independent estimate before documents are sent to the broker");
+    }
+    const { orderId, documents, documentReview, independentEstimate } = preflight;
     this.validateDocuments(documents);
-    audit.push("Validated required trade document fields");
+    const audit = [...preflight.audit, "User confirmed the independent estimate"];
+    log("info", "importer-agent", "broker_quote.started", { orderId, preflightId });
     const response = await this.fetch(`${this.customsBrokerApiUrl}/customs/quotes`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -43,51 +123,147 @@ export class ImporterAgent {
       throw new Error(`Customs quote failed: ${response.status} ${await response.text()}`);
     }
     const { quote } = (await response.json()) as CustomsQuoteResponse;
-    audit.push(`Received quote ${quote.quoteId}; no payment was made`);
-    log("info", "importer-agent", "quote.completed", {
+    const complianceReview = reviewImportQuote(documents, quote, this.brokerFeeUsd);
+    audit.push(`Received broker quote ${quote.quoteId} and compared it with the independent estimate`);
+    const result: QuoteResult = {
+      preflightId,
       orderId,
+      documents,
+      documentReview,
+      independentEstimate,
+      estimateApproved: true,
+      transmittedToBroker: true,
+      quote,
+      complianceReview,
+      audit
+    };
+    this.quoteStore.set(quote.quoteId, result);
+    log("info", "importer-agent", "broker_quote.completed", {
+      orderId,
+      preflightId,
       quoteId: quote.quoteId,
-      totalEstimatedUsd: quote.totalEstimatedUsd,
-      brokerFeeUsd: quote.customsBrokerFeeUsd
+      independentEstimateUsd: independentEstimate.estimatedTotalUsd,
+      brokerEstimateUsd: quote.totalEstimatedUsd,
+      paymentAllowed: complianceReview.paymentAllowed
     });
-    return { orderId, documents, quote, audit };
+    return result;
   }
 
   async submit(orderId: string, quoteId: string, humanApproved = false): Promise<SubmissionResult> {
     const audit: string[] = [];
-    log("info", "importer-agent", "submission.started", { orderId, quoteId, humanApproved });
-    const documents = getMockExportDocuments(orderId);
+    const paymentAttemptId = `ATTEMPT-${randomUUID()}`;
+    log("info", "payment-audit", "payment.attempted", {
+      paymentAttemptId, orderId, quoteId, humanApproved
+    });
+    const reviewedQuote = this.quoteStore.get(quoteId);
+    if (!reviewedQuote || reviewedQuote.orderId !== orderId) {
+      log("warn", "payment-audit", "payment.precondition_blocked", {
+        paymentAttemptId, orderId, quoteId, reasonCode: "REVIEWED_QUOTE_NOT_FOUND"
+      });
+      throw new Error("A matching reviewed broker quote is required before payment");
+    }
+    if (!reviewedQuote.complianceReview.paymentAllowed) {
+      log("warn", "payment-audit", "payment.precondition_blocked", {
+        paymentAttemptId, orderId, quoteId, reasonCode: "COMPLIANCE_REVIEW_BLOCKED"
+      });
+      throw new Error("Broker quote comparison blocked payment; resolve blocker findings before filing");
+    }
+    if (Date.parse(reviewedQuote.quote.expiresAt) <= Date.now()) {
+      log("warn", "payment-audit", "payment.precondition_blocked", {
+        paymentAttemptId, orderId, quoteId, reasonCode: "QUOTE_EXPIRED",
+        expiresAt: reviewedQuote.quote.expiresAt
+      });
+      throw new Error("Broker quote expired before payment");
+    }
+    const { documents } = reviewedQuote;
     this.validateDocuments(documents);
-    assertPaymentAllowed(this.policy, this.brokerFeeUsd, this.brokerAddress, humanApproved);
-    audit.push("Payment request passed importer policy checks");
-    log("info", "importer-agent", "payment.approved", {
+    log("info", "payment-audit", "policy.evaluation.started", {
+      paymentAttemptId, orderId, quoteId, amountUsdc: this.brokerFeeUsd,
+      payee: this.brokerAddress, humanApproved
+    });
+    let paymentPolicyDecision: PaymentPolicyDecision;
+    try {
+      paymentPolicyDecision = assertPaymentAllowed(
+        this.policy, this.brokerFeeUsd, this.brokerAddress, humanApproved, this.paymentHistory
+      );
+    } catch (error) {
+      if (error instanceof PaymentPolicyError) {
+        log("warn", "payment-audit", "policy.evaluation.blocked", {
+          paymentAttemptId, orderId, quoteId, ...error.decision
+        });
+      }
+      throw error;
+    }
+    audit.push(`Payment policy approved; auditId=${paymentPolicyDecision.auditId}`);
+    log("info", "payment-audit", "policy.evaluation.allowed", {
       orderId,
       quoteId,
-      amount: this.brokerFeeUsd,
+      paymentAttemptId,
+      ...paymentPolicyDecision,
       importerAddress: this.importerAddress,
-      brokerAddress: this.brokerAddress
+      brokerAddress: this.brokerAddress,
+      networkAction: "x402-payment"
     });
-    const paidResponse = await this.paidFetch(`${this.customsBrokerApiUrl}/customs/declarations`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ quoteId, documents })
+    log("info", "payment-audit", "payment.dispatched", {
+      paymentAttemptId, auditId: paymentPolicyDecision.auditId,
+      orderId, quoteId, amountUsdc: this.brokerFeeUsd
     });
-    if (!paidResponse.ok) {
-      throw new Error(`Customs broker payment failed: ${paidResponse.status} ${await paidResponse.text()}`);
+    let paidResponse: Response;
+    try {
+      paidResponse = await this.paidFetch(`${this.customsBrokerApiUrl}/customs/declarations`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ quoteId, documents })
+      });
+    } catch (error) {
+      log("error", "payment-audit", "payment.transport_failed", {
+        auditId: paymentPolicyDecision.auditId,
+        paymentAttemptId,
+        orderId,
+        quoteId,
+        message: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
     }
-    const result = (await paidResponse.json()) as CustomsBrokerResponse;
+    if (!paidResponse.ok) {
+      const responseText = await paidResponse.text();
+      log("error", "payment-audit", "payment.rejected", {
+        paymentAttemptId, auditId: paymentPolicyDecision.auditId,
+        orderId, quoteId, status: paidResponse.status
+      });
+      throw new Error(`Customs broker payment failed: ${paidResponse.status} ${responseText}`);
+    }
+    const response = (await paidResponse.json()) as CustomsBrokerResponse;
     const paymentResponse = paidResponse.headers.get("payment-response");
     const settlement = paymentResponse ? decodePaymentResponseHeader(paymentResponse) : undefined;
-    audit.push(`Paid customs broker and received receipt ${result.receipt.receiptId}`);
-    log("info", "importer-agent", "submission.completed", {
+    this.paymentHistory.push({
+      timestamp: response.receipt.timestamp,
+      amountUsdc: response.receipt.brokerFeeUsd,
+      payee: response.receipt.brokerAddress,
+      quoteId,
+      receiptId: response.receipt.receiptId
+    });
+    this.quoteStore.delete(quoteId);
+    log("info", "payment-audit", "payment.succeeded", {
+      auditId: paymentPolicyDecision.auditId,
+      paymentAttemptId,
       orderId,
       quoteId,
-      declarationId: result.receipt.declarationId,
-      receiptId: result.receipt.receiptId,
-      brokerFeeUsd: result.receipt.brokerFeeUsd,
-      settlement
+      receiptId: response.receipt.receiptId,
+      amountUsdc: response.receipt.brokerFeeUsd,
+      payee: response.receipt.brokerAddress,
+      settlementRecorded: Boolean(settlement)
     });
-    return { orderId, documents, quote: result.quote, receipt: result.receipt, settlement, audit };
+    audit.push(`Paid customs broker and received receipt ${response.receipt.receiptId}`);
+    return {
+      ...reviewedQuote,
+      quote: response.quote,
+      complianceReview: reviewImportQuote(documents, response.quote, this.brokerFeeUsd),
+      paymentPolicyDecision,
+      receipt: response.receipt,
+      settlement,
+      audit: [...reviewedQuote.audit, ...audit]
+    };
   }
 
   private validateDocuments(documents: ExportDocuments) {
