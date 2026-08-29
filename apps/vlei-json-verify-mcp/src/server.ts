@@ -9,7 +9,6 @@ import { z } from "zod";
 
 export interface VerifyVleiJsonInput {
   envelope: Record<string, unknown>;
-  expectedRootAid: string;
   expectedLei?: string | undefined;
 }
 
@@ -18,14 +17,22 @@ export type VerifyVleiJson = (
   options: { expectedRootAid: string; expectedLei?: string | undefined },
 ) => Promise<VerificationResult>;
 
+export type DeriveRootAid = (seed: string) => Promise<string>;
+
 export async function verifyVleiJsonTool(
   input: VerifyVleiJsonInput,
   verify: VerifyVleiJson = VleiJsonSigning.verifyJson,
+  deriveRootAid: DeriveRootAid = VleiJsonSigning.deriveRootAid,
+  rootSeed: string | undefined = process.env.VLEI_ROOT_SEED,
 ) {
   try {
+    if (!rootSeed?.trim()) {
+      throw new Error("VLEI_ROOT_SEED is required to derive the trusted root AID");
+    }
+    const expectedRootAid = await deriveRootAid(rootSeed);
     const envelope = input.envelope as unknown as SignedJsonEnvelope<JsonValue>;
     const result = await verify(envelope, {
-      expectedRootAid: input.expectedRootAid,
+      expectedRootAid,
       expectedLei: input.expectedLei,
     });
 
@@ -47,7 +54,11 @@ export async function verifyVleiJsonTool(
   }
 }
 
-export function createServer(verify: VerifyVleiJson = VleiJsonSigning.verifyJson) {
+export function createServer(
+  verify: VerifyVleiJson = VleiJsonSigning.verifyJson,
+  deriveRootAid: DeriveRootAid = VleiJsonSigning.deriveRootAid,
+  rootSeed: string | undefined = process.env.VLEI_ROOT_SEED,
+) {
   const server = new McpServer({
     name: "vlei-json-verify-mcp",
     version: "0.1.0",
@@ -58,16 +69,11 @@ export function createServer(verify: VerifyVleiJson = VleiJsonSigning.verifyJson
     {
       title: "Verify vLEI-signed JSON",
       description:
-        "Verify a self-contained vLEI-signed JSON envelope against a trusted root AID and, optionally, an expected LEI. Returns the verified payload and signer when valid, or validation errors when invalid.",
+        "Verify a self-contained vLEI-signed JSON envelope against the trusted root AID derived from the server's VLEI_ROOT_SEED and, optionally, an expected LEI. Returns the verified payload and signer when valid, or validation errors when invalid.",
       inputSchema: {
         envelope: z
           .record(z.string(), z.unknown())
           .describe("The complete vLEI signed JSON envelope"),
-        expectedRootAid: z
-          .string()
-          .trim()
-          .min(1)
-          .describe("Trusted root AID that must anchor the envelope proof"),
         expectedLei: z
           .string()
           .trim()
@@ -76,7 +82,7 @@ export function createServer(verify: VerifyVleiJson = VleiJsonSigning.verifyJson
           .describe("Optional LEI that the signed JSON must belong to"),
       },
     },
-    (input) => verifyVleiJsonTool(input, verify),
+    (input) => verifyVleiJsonTool(input, verify, deriveRootAid, rootSeed),
   );
 
   return server;

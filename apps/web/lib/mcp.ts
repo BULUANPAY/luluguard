@@ -2,7 +2,10 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import {
+  getDefaultEnvironment,
+  StdioClientTransport
+} from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 export async function withMcpClient<T>(operation: (client: Client) => Promise<T>): Promise<T> {
@@ -44,10 +47,15 @@ function vleiVerifyMcpArgs(): string[] {
 
 export async function withVleiVerifyMcpClient<T>(operation: (client: Client) => Promise<T>): Promise<T> {
   const client = new Client({ name: "luluguard-web-vlei-verifier", version: "0.1.0" });
+  const rootSeed = process.env.VLEI_ROOT_SEED;
   const transport = new StdioClientTransport({
     command: process.env.VLEI_VERIFY_MCP_COMMAND ?? "pnpm",
     args: vleiVerifyMcpArgs(),
     cwd: process.env.VLEI_VERIFY_MCP_CWD ?? findWorkspaceRoot(process.cwd()),
+    env: {
+      ...getDefaultEnvironment(),
+      ...(rootSeed ? { VLEI_ROOT_SEED: rootSeed } : {})
+    },
     stderr: "inherit"
   });
   await client.connect(transport);

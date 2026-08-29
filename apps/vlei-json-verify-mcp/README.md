@@ -1,14 +1,15 @@
 # vLEI JSON Verify MCP
 
-透過 MCP tool 呼叫 `@repo/vlei-json-signing` 的 static `verifyJson()` method，驗證
-自包含的 vLEI-signed JSON envelope。服務採用 stdio transport，不需要 root seed 或
-signing state。
+透過 MCP tool 呼叫 `@repo/vlei-json-signing` 的 static `deriveRootAid()` 與
+`verifyJson()` method，驗證自包含的 vLEI-signed JSON envelope。服務採用 stdio
+transport，會使用 `VLEI_ROOT_SEED` 固定推導可信任的 root AID，不需要 signing state。
 
 ## Requirements
 
 - Node.js 24+
 - Python 3.8+
 - 已初始化 `vendor/vlei-sandbox` submodule
+- 已設定 `VLEI_ROOT_SEED`；從 repository 啟動時會自動讀取 root `.env`
 
 ## Build
 
@@ -46,7 +47,6 @@ pnpm --filter @luluguard/vlei-json-verify-mcp... build
 輸入：
 
 - `envelope`: 完整的 vLEI-signed JSON envelope
-- `expectedRootAid`: 呼叫端信任的 root AID
 - `expectedLei`: 可選；限制 envelope 必須屬於指定 LEI
 
 簽章有效時，結果包含 `valid: true`、原始 `payload`、signer、root AID、LEI 與
