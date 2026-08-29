@@ -62,6 +62,12 @@ uploaded-files/<order-id>/<document-type>/*.json
 
 應忽略隱藏檔、暫存檔及非 `.json` 檔案。不得將目錄名稱或檔案內容視為可信輸入。
 
+### MCP consumer
+
+Importer MCP 提供唯讀的 `get_order_files` tool，讓 Agent 以 `orderId` 取得文件，或用選填的 `documentTypes` 限縮類型。tool 會回傳每個檔案的文件類型、檔名、repo-relative path、大小及解析後的 JSON 內容。
+
+`apps/web` Agent 已開放此 tool，並固定以頁面目前選取的訂單編號呼叫，避免模型自行指定其他訂單。未來其他 consumer 也應透過 MCP 或等效的受控讀取層存取，不應讓模型直接操作 filesystem path。
+
 ## 刪除與更新
 
 上傳採 append-only：新版本應產生新的 UUID 檔名，不直接覆寫舊檔。若產品未來需要版本關係，應由獨立 metadata/index 記錄新舊版本，不改變上述實體路徑結構。

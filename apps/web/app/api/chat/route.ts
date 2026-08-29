@@ -2,7 +2,8 @@ import { generateAiAnswer, type ChatMessage } from "../../../lib/ai";
 import { mcpResultText, withMcpClient, withVleiVerifyMcpClient } from "../../../lib/mcp";
 
 export const runtime = "nodejs";
-const instructions = `你是進口商 AI 助理。文件預檢階段只使用 review_import_documents，在進口商端檢查文件並產生獨立預估，不得聯絡報關行。
+const instructions = `你是進口商 AI 助理。使用者詢問已上傳的訂單文件或需要文件內容判斷時，使用 get_order_files；不得假設未出現在工具結果中的文件或欄位。
+文件預檢階段使用 review_import_documents，在進口商端檢查文件並產生獨立預估，不得聯絡報關行。
 使用者按下確認預估並詢價後，才使用 get_import_quote，把該 preflightId 的文件送給報關行，並比較 independentEstimate、quote 與 complianceReview。
 向使用者說明候選稅則、預估稅費、報關行服務費、有效期限、缺件、差異與付款 blocker。不得宣稱 AI 已完成法定稅則核定。
 只有使用者在後續訊息明確同意付款時，才可用該 quoteId 呼叫 submit_import_declaration；不可跳過報價，也不可自行將 humanApproved 設為 true。
@@ -41,11 +42,12 @@ export async function POST(request: Request) {
     const workflow: { preflightId?: string; readyForBroker?: boolean; quoteId?: string } = {};
     const answer = await withMcpClient(async (mcp) => withVleiVerifyMcpClient(async (vleiMcp) => {
       const [listed, vleiListed] = await Promise.all([mcp.listTools(), vleiMcp.listTools()]);
+      const fileTools = ["get_order_files"];
       const allowedTools = workflowAction === "precheck"
-        ? ["review_import_documents"]
+        ? [...fileTools, "review_import_documents"]
         : workflowAction === "broker_quote"
-          ? ["get_import_quote"]
-          : ["submit_import_declaration"];
+          ? [...fileTools, "get_import_quote"]
+          : [...fileTools, "submit_import_declaration"];
       const availableTools = [
         ...listed.tools.filter(tool => allowedTools.includes(tool.name)),
         ...vleiListed.tools.filter(tool => tool.name === "verify_vlei_json")
@@ -63,6 +65,9 @@ export async function POST(request: Request) {
           if (name === "review_import_documents") {
             args.orderId = body.orderId;
             args.documentTypes = selectedDocuments;
+          }
+          if (name === "get_order_files") {
+            args.orderId = body.orderId;
           }
           if (name === "get_import_quote") {
             args.preflightId = body.preflightId;
