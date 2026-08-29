@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { decodePaymentResponseHeader } from "@x402/fetch";
 import type {
   AgentPolicy,
@@ -11,6 +12,7 @@ import type {
 import { log } from "./logger.js";
 import {
   assertPaymentAllowed,
+  isAllowedPayee,
   PaymentPolicyError,
   type PaymentPolicyDecision,
   type PaymentRecord,
@@ -134,7 +136,10 @@ export class ImporterAgent {
     this.audit(
       "preflight.review",
       "succeeded",
-      { input: { orderId, providedDocuments: documents.providedDocuments }, result },
+      {
+        input: { orderId, providedDocuments: documents.providedDocuments },
+        result,
+      },
       preflightId,
     );
     log(
@@ -486,6 +491,7 @@ export class ImporterAgent {
       );
     }
     const response = (await paidResponse.json()) as CustomsBrokerResponse;
+    this.validateBrokerResponse(reviewedQuote.quote, response);
     const paymentResponse = paidResponse.headers.get("payment-response");
     const settlement = paymentResponse
       ? decodePaymentResponseHeader(paymentResponse)
@@ -503,9 +509,9 @@ export class ImporterAgent {
       paymentAttemptId,
     );
     this.paymentHistory.push({
-      timestamp: response.receipt.timestamp,
-      amountUsdc: response.receipt.brokerFeeUsd,
-      payee: response.receipt.brokerAddress,
+      timestamp: new Date().toISOString(),
+      amountUsdc: this.brokerFeeUsd,
+      payee: this.brokerAddress,
       quoteId,
       receiptId: response.receipt.receiptId,
     });
@@ -559,6 +565,36 @@ export class ImporterAgent {
       throw new Error("Trade documents contain no items");
     if (documents.items.some((item) => !item.hsCode)) {
       throw new Error("Every item must have an HS code before customs filing");
+    }
+  }
+
+  private validateBrokerResponse(
+    reviewedQuote: DutyQuote,
+    response: CustomsBrokerResponse,
+  ) {
+    if (!isDeepStrictEqual(response.quote, reviewedQuote)) {
+      throw new Error("Paid broker response does not match the reviewed quote");
+    }
+    if (response.receipt.declarationId !== reviewedQuote.declarationId) {
+      throw new Error(
+        "Broker receipt declaration does not match the reviewed quote",
+      );
+    }
+    if (
+      Math.abs(response.receipt.brokerFeeUsd - this.brokerFeeUsd) > 0.000001
+    ) {
+      throw new Error("Broker receipt fee does not match the approved payment");
+    }
+    if (!isAllowedPayee(response.receipt.brokerAddress, this.brokerAddress)) {
+      throw new Error(
+        "Broker receipt address does not match the approved payee",
+      );
+    }
+    if (response.receipt.status !== "filed") {
+      throw new Error("Broker receipt does not confirm a filed declaration");
+    }
+    if (!Number.isFinite(Date.parse(response.receipt.timestamp))) {
+      throw new Error("Broker receipt timestamp is invalid");
     }
   }
 }

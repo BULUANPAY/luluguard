@@ -19,7 +19,10 @@ function freeQuoteFetch(onCall?: () => void): typeof globalThis.fetch {
   };
 }
 
-function fakePaidFetch(onCall?: () => void): typeof globalThis.fetch {
+function fakePaidFetch(
+  onCall?: () => void,
+  receiptBrokerAddress = brokerAddress,
+): typeof globalThis.fetch {
   return async () => {
     onCall?.();
     return new Response(
@@ -29,7 +32,7 @@ function fakePaidFetch(onCall?: () => void): typeof globalThis.fetch {
           receiptId: "CBR-TEST",
           declarationId: quote.declarationId,
           brokerFeeUsd: 0.01,
-          brokerAddress,
+          brokerAddress: receiptBrokerAddress,
           status: "filed",
           timestamp: new Date().toISOString(),
         },
@@ -136,7 +139,7 @@ test("importer and customs broker may use the same address", async () => {
       requireHumanApprovalAboveUsd: 0,
     },
     freeQuoteFetch(),
-    fakePaidFetch(),
+    fakePaidFetch(undefined, importerAddress),
     0.01,
     importerAddress,
     importerAddress,
@@ -144,6 +147,21 @@ test("importer and customs broker may use the same address", async () => {
   await precheckAndQuote(agent, "TEST-SAME");
   const result = await agent.submit("TEST-SAME", quoteId, true);
   assert.equal(result.receipt.status, "filed");
+  assert.equal(result.receipt.brokerAddress, importerAddress);
+});
+
+test("rejects a receipt from a different broker address", async () => {
+  const unexpectedBroker = "0x3333333333333333333333333333333333333333";
+  const agent = createAgent(
+    undefined,
+    fakePaidFetch(undefined, unexpectedBroker),
+  );
+  await precheckAndQuote(agent, "TEST-WRONG-BROKER");
+
+  await assert.rejects(
+    () => agent.submit("TEST-WRONG-BROKER", quoteId, true),
+    /receipt address does not match the approved payee/i,
+  );
 });
 
 test("quote compares broker fees with the independent importer estimate", async () => {
