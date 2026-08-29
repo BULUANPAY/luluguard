@@ -36,9 +36,29 @@ describe("export document helpers", () => {
     if (document.document_type !== "PACKING_LIST")
       throw new Error("unexpected type");
     expect(document.related_invoice).toMatch(/^INV-UNI-/);
+    expect(document.exporter.region).toBe("Scotland");
+    expect(document.importer.country).toBe("Taiwan");
+    expect(document.cargo[0]?.description).toBe("Unicorn");
+    expect(document.cargo[0]?.quantity).toBe(10000);
     expect(document.packages.total_quantity).toBe(document.cargo[0]?.quantity);
     expect(document.weight.gross_weight_kg).toBeGreaterThan(
       document.weight.net_weight_kg,
+    );
+  });
+
+  it("loads the same 10,000 Scottish unicorns in the invoice", () => {
+    const document = createTestExportDocument(
+      "COMMERCIAL_INVOICE",
+      "Sinclair Livestock Exports Ltd.",
+    );
+
+    if (document.document_type !== "COMMERCIAL_INVOICE")
+      throw new Error("unexpected type");
+    expect(document.items[0]?.description).toBe("Unicorn");
+    expect(document.items[0]?.quantity).toBe(10000);
+    expect(document.totals.total_quantity).toBe(10000);
+    expect(document.totals.total_amount).toBe(
+      document.items[0]!.quantity * document.items[0]!.unit_price,
     );
   });
 
