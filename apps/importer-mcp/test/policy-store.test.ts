@@ -29,3 +29,15 @@ test("disabled policy blocks non-payment agent operations", () => {
   assert.throws(() => store.assertAgentEnabled(), /disabled by administrator/);
   assert.throws(() => store.assertPaymentEnabled(), /policy status is DISABLED/);
 });
+
+test("preserves the initial policy status", () => {
+  const store = new PolicyStore({
+    status: "DISABLED",
+    maxPaymentUsd: 1,
+    requireHumanApprovalAboveUsd: 0,
+    allowedPayees: [address]
+  });
+
+  assert.equal(store.get().status, "DISABLED");
+  assert.throws(() => store.assertAgentEnabled(), /disabled by administrator/);
+});

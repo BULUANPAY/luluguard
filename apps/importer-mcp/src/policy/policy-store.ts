@@ -23,7 +23,7 @@ export class PolicyStore {
       ...initial,
       maxDailySpendUsd: initial.maxDailySpendUsd ?? initial.maxPaymentUsd,
       maxPaymentsPerHour: initial.maxPaymentsPerHour ?? 1,
-      status: "ACTIVE",
+      status: initial.status ?? "ACTIVE",
       version: 1,
       updatedAt: new Date().toISOString()
     };
