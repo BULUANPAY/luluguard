@@ -5,7 +5,7 @@
 
 ## 環境變數
 
-- `VLEI_SIGNING_API_PORT`：服務監聽的埠號，預設 `3000`
+- `VLEI_SIGNING_API_PORT`：服務監聽的埠號，預設 `3001`
 - `VLEI_STATE_DIR`：`VleiJsonSigning` 的狀態目錄
 - `VLEI_ROOT_SEED`：根金鑰種子（由 `@repo/vlei-json-signing` 內部讀取）
 
