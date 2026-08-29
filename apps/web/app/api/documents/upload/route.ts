@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { sessionFromRequest } from "../../../../lib/sandbox-auth";
 import documentTypes from "../../../example-document-types.json";
 
 export const runtime = "nodejs";
@@ -17,6 +18,13 @@ function safeFilename(filename: string) {
 }
 
 export async function POST(request: Request) {
+  if (!sessionFromRequest(request)) {
+    return NextResponse.json(
+      { error: "請先登入員工帳號。" },
+      { status: 401 },
+    );
+  }
+
   try {
     const formData = await request.formData();
     const orderId = String(formData.get("orderId") ?? "").trim();
