@@ -26,7 +26,22 @@ h1 { margin: 8px 0 12px; font-size: clamp(34px, 6vw, 58px); letter-spacing: -.04
 .document-card em { align-self: start; color: #79a69d; font-size: 10px; font-style: normal; font-weight: 800; }
 .document-note { margin: 14px 0 0; color: #8fa9a4; font-size: 12px; line-height: 1.55; }
 .order-field { display: grid; gap: 7px; margin-bottom: 14px; color: #b8d2cd; font-size: 13px; }
-.order-field input { border: 1px solid #35636a; border-radius: 12px; padding: 11px 13px; background: #071214; color: inherit; font: inherit; }
+.order-field select { border: 1px solid #35636a; border-radius: 12px; padding: 11px 13px; background: #071214; color: inherit; font: inherit; }
+.upload-panel { margin-top: 20px; padding: 20px; border: 1px solid #28545a; border-radius: 18px; background: #081719aa; }
+.upload-form { margin-top: 0; }
+.upload-form label { display: grid; gap: 7px; color: #b8d2cd; font-size: 13px; }
+.upload-form input, .upload-form select { width: 100%; border: 1px solid #35636a; border-radius: 12px; padding: 11px 13px; background: #071214; color: inherit; font: inherit; }
+.file-picker input { padding: 9px; }
+.file-picker input::file-selector-button { margin-right: 12px; border: 0; border-radius: 8px; padding: 7px 11px; background: #204f4b; color: #d8f4ed; cursor: pointer; }
+.selected-files, .upload-result ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.selected-files li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: 8px; background: #071214; color: #cce1dd; font-size: 13px; }
+.selected-files small { color: #799b95; }
+.upload-result { margin: 14px 0 0; padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
+.upload-result.error { border: 1px solid #71363a; background: #321417; color: #ffb4b8; }
+.upload-result.success { border: 1px solid #397a6b; background: #0d2924; color: #8ce4cc; }
+.upload-result.success ul { margin-top: 8px; }
+.upload-result.success li { color: #d4e8e3; }
+.upload-result.success small { display: block; color: #799b95; overflow-wrap: anywhere; }
 .workflow-status { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 18px; }
 .workflow-status span { padding: 10px; border: 1px solid #29494d; border-radius: 10px; color: #6f918b; font-size: 11px; line-height: 1.4; }
 .workflow-status .active { border-color: #d5b761; color: #f1d98d; }

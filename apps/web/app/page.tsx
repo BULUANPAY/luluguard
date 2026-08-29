@@ -1,5 +1,6 @@
 "use client";
-import { FormEvent, useState } from "react";
+import { FormEvent, type ReactNode, useState } from "react";
+import { DocumentUpload } from "./components/document-upload";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type WorkflowAction = "chat" | "precheck" | "broker_quote" | "payment";
@@ -12,8 +13,9 @@ const documentOptions = [
   { type: "product_specification", label: "產品規格書", detail: "型號、材質與用途", required: false },
   { type: "import_permit", label: "輸入許可證", detail: "受管制商品適用", required: false }
 ] as const;
+const orderOptions = ["ORD-1001", "ORD-1002", "ORD-1003", "ORD-1004"];
 
-export default function Home() {
+export default function Home(): ReactNode {
   const [orderId, setOrderId] = useState("ORD-1001");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -94,7 +96,9 @@ export default function Home() {
           </div>
           <label className="order-field" htmlFor="orderId">
             訂單編號
-            <input id="orderId" value={orderId} onChange={event => { setOrderId(event.target.value); resetPreflight(); }} />
+            <select id="orderId" value={orderId} onChange={event => { setOrderId(event.target.value); resetPreflight(); }}>
+              {orderOptions.map(order => <option key={order} value={order}>{order}</option>)}
+            </select>
           </label>
           <div className="document-grid">
             {documentOptions.map(document => {
@@ -134,6 +138,7 @@ export default function Home() {
             )}
           </div>
         </section>
+        <DocumentUpload orderId={orderId} />
         <div className="conversation" aria-live="polite">
           {messages.map((item, index) => (
             <div className={`message ${item.role}`} key={`${item.role}-${index}`}>
