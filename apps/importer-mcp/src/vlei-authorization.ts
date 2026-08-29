@@ -22,7 +22,24 @@ export interface VerifiedAgentAuthorization {
   action: AuthorizedWorkflowAction;
 }
 
-const consumedNonces = new Set<string>();
+export class AuthorizationReplayGuard {
+  private readonly consumed = new Map<string, number>();
+
+  consume(nonce: string, expiresAtMs: number, nowMs = Date.now()): boolean {
+    for (const [consumedNonce, expiry] of this.consumed) {
+      if (expiry <= nowMs) this.consumed.delete(consumedNonce);
+    }
+    if (expiresAtMs <= nowMs || this.consumed.has(nonce)) return false;
+    this.consumed.set(nonce, expiresAtMs);
+    return true;
+  }
+
+  get activeCount(): number {
+    return this.consumed.size;
+  }
+}
+
+const authorizationReplayGuard = new AuthorizationReplayGuard();
 const authorizationPayloadSchema = z.object({
   type: z.literal("LuLuGuardSandboxAgentAuthorization"),
   authorizationId: z.string().min(1),
@@ -166,14 +183,14 @@ export async function verifyAgentAuthorization(input: {
   }
   if (payload.action !== input.action)
     reject("vLEI authorization action mismatch");
+  const now = Date.now();
+  const expiresAtMs = Date.parse(payload.expiresAt);
   if (
-    Date.parse(payload.issuedAt) > Date.now() + 30_000 ||
-    Date.parse(payload.expiresAt) <= Date.now()
+    Date.parse(payload.issuedAt) > now + 30_000 ||
+    expiresAtMs <= now
   ) {
     reject("vLEI authorization is not currently valid");
   }
-  if (consumedNonces.has(payload.nonce))
-    reject("vLEI authorization has already been used");
   if (
     payload.employeeId !== signerInfo.employeeId ||
     payload.tenantId !== signerInfo.tenantId ||
@@ -196,7 +213,9 @@ export async function verifyAgentAuthorization(input: {
         : "vLEI authorization resource mismatch",
     );
   }
-  consumedNonces.add(payload.nonce);
+  if (!authorizationReplayGuard.consume(payload.nonce, expiresAtMs, now)) {
+    reject("vLEI authorization has already been used");
+  }
 
   const verified: VerifiedAgentAuthorization = {
     tenantId: payload.tenantId,
