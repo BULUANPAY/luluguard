@@ -269,6 +269,37 @@ test("missing required documents are blocked before broker transmission", async 
   ]);
 });
 
+test("invalid invoice and packing values are blocked before broker transmission", async () => {
+  let brokerCalled = false;
+  const agent = createAgent(
+    undefined,
+    undefined,
+    freeQuoteFetch(() => {
+      brokerCalled = true;
+    }),
+  );
+  const documents = getMockExportDocuments("TEST-INVALID-NUMBERS");
+  documents.items[0]!.quantity = -1;
+  documents.grossWeightKg = 400;
+  documents.netWeightKg = 420;
+
+  const result = agent.precheck("TEST-INVALID-NUMBERS", documents);
+
+  assert.equal(result.readyForBroker, false);
+  assert.equal(result.independentEstimate, undefined);
+  assert.equal(brokerCalled, false);
+  assert.ok(
+    result.documentReview.findings.some(
+      (finding) => finding.code === "COMMERCIAL_INVOICE_INCOMPLETE",
+    ),
+  );
+  assert.ok(
+    result.documentReview.findings.some(
+      (finding) => finding.code === "PACKING_LIST_INCOMPLETE",
+    ),
+  );
+});
+
 test("broker quote requires explicit estimate confirmation", async () => {
   let brokerCalled = false;
   const agent = createAgent(
