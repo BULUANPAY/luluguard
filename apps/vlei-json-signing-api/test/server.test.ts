@@ -3,8 +3,10 @@ import { Readable } from "node:stream";
 import { test } from "node:test";
 import type { IncomingMessage } from "node:http";
 import {
+  DEFAULT_ALLOWED_ORIGIN,
   MAX_REQUEST_BODY_BYTES,
   RequestBodyTooLargeError,
+  corsHeaders,
   readRequestBody,
 } from "../src/server.js";
 
@@ -41,4 +43,24 @@ test("rejects an oversized chunked request", async () => {
     ),
     RequestBodyTooLargeError,
   );
+});
+
+test("restricts browser access to the portal origin by default", () => {
+  const previousOrigin = process.env.VLEI_SIGNING_ALLOWED_ORIGIN;
+  delete process.env.VLEI_SIGNING_ALLOWED_ORIGIN;
+  try {
+    assert.equal(
+      corsHeaders()["access-control-allow-origin"],
+      DEFAULT_ALLOWED_ORIGIN,
+    );
+    process.env.VLEI_SIGNING_ALLOWED_ORIGIN = "https://portal.example";
+    assert.equal(
+      corsHeaders()["access-control-allow-origin"],
+      "https://portal.example",
+    );
+  } finally {
+    if (previousOrigin === undefined)
+      delete process.env.VLEI_SIGNING_ALLOWED_ORIGIN;
+    else process.env.VLEI_SIGNING_ALLOWED_ORIGIN = previousOrigin;
+  }
 });

@@ -119,7 +119,7 @@ pnpm dev:portal
 The portal defaults to `http://localhost:3001` for signing. Override it with
 `VITE_VLEI_SIGNING_API_URL`; set `VITE_VLEI_SIGNING_LEI` to use another valid
 ISO 17442 LEI. The signing API's browser origin can be restricted with
-`VLEI_SIGNING_ALLOWED_ORIGIN`.
+`VLEI_SIGNING_ALLOWED_ORIGIN`; it defaults to `http://localhost:5173`.
 
 Confirm that the MCP server is available:
 

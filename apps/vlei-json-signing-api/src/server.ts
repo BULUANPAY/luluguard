@@ -21,6 +21,7 @@ interface SignRequestBody {
 }
 
 export const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
+export const DEFAULT_ALLOWED_ORIGIN = "http://localhost:5173";
 
 export class RequestBodyTooLargeError extends Error {
   constructor() {
@@ -52,10 +53,10 @@ function deriveSignerId(info: JsonObject): string {
   return `signer-${digest.slice(0, 32)}`;
 }
 
-function corsHeaders(): Record<string, string> {
+export function corsHeaders(): Record<string, string> {
   return {
     "access-control-allow-origin":
-      process.env.VLEI_SIGNING_ALLOWED_ORIGIN ?? "*",
+      process.env.VLEI_SIGNING_ALLOWED_ORIGIN?.trim() || DEFAULT_ALLOWED_ORIGIN,
     "access-control-allow-methods": "GET, POST, OPTIONS",
     "access-control-allow-headers": "content-type",
   };
