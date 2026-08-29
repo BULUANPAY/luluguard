@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import documentTypes from "../../../example-document-types.json";
 
 export const runtime = "nodejs";
 
@@ -25,8 +26,8 @@ export async function POST(request: Request) {
     if (!safeSegmentPattern.test(orderId)) {
       return NextResponse.json({ error: "訂單編號格式不正確。" }, { status: 400 });
     }
-    if (!safeSegmentPattern.test(documentType)) {
-      return NextResponse.json({ error: "文件類型僅能包含英文字母、數字、連字號與底線，最多 64 字元。" }, { status: 400 });
+    if (!safeSegmentPattern.test(documentType) || !documentTypes.some(candidate => candidate.type === documentType)) {
+      return NextResponse.json({ error: "不支援此文件類型。" }, { status: 400 });
     }
     if (files.length === 0 || files.length > MAX_FILES) {
       return NextResponse.json({ error: `請選擇 1 至 ${MAX_FILES} 個 JSON 檔案。` }, { status: 400 });

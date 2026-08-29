@@ -7,6 +7,8 @@ import {
 } from "../../../lib/audit";
 import { sessionFromRequest } from "../../../lib/sandbox-auth";
 import { createAgentAuthorization } from "../../../lib/vlei-authorization";
+import documentTypes from "../../example-document-types.json";
+import exampleOrders from "../../example-orders.json";
 
 export const runtime = "nodejs";
 const instructions = `你是進口商 AI 助理。使用者詢問已上傳的訂單文件或需要文件內容判斷時，使用 get_order_files；不得假設未出現在工具結果中的文件或欄位。
@@ -15,7 +17,7 @@ const instructions = `你是進口商 AI 助理。使用者詢問已上傳的訂
 向使用者說明候選稅則、預估稅費、報關行服務費、有效期限、缺件、差異與付款 blocker。不得宣稱 AI 已完成法定稅則核定。
 只有使用者在後續訊息明確同意付款時，才可用該 quoteId 呼叫 submit_import_declaration；不可跳過報價，也不可自行將 humanApproved 設為 true。
 complianceReview.paymentAllowed 為 false 時，不得嘗試付款，必須先請使用者補正 blocker。
-使用者要求驗證已上傳的 vLEI 文件時，由你判斷是否呼叫 verify_uploaded_vlei_documents。此工具會從目前訂單讀取原始文件，並只驗證 v 為 "VLEIJSON-1.0" 且包含 payload、protected、signature、signer 與 proof 的文件；一般 JSON 不需驗證。可信任的 root AID 由 MCP 內部使用 VLEI_ROOT_SEED 固定推導，不可要求使用者提供，也不可把 envelope proof 內自帶的 rootAid 當成信任來源。驗證失敗時應清楚說明 errors，不可使用未驗證的 payload 做後續決策。
+使用者要求驗證已上傳的 vLEI 文件時，由你判斷是否呼叫 verify_uploaded_vlei_documents。此工具會從目前訂單讀取原始文件，並只驗證 v 為 "VLEIJSON-1.0" 且包含 payload、protected、signature、signer 與 proof 的文件；一般 JSON 不需驗證。由出口商提供的文件會強制比對簽章 LEI 與訂單出口商 LEI。可信任的 root AID 由 MCP 內部使用 VLEI_ROOT_SEED 固定推導，不可要求使用者提供，也不可把 envelope proof 內自帶的 rootAid 當成信任來源。驗證失敗時應清楚說明 errors，不可使用未驗證的 payload 做後續決策。
 請使用繁體中文簡潔回答，並清楚標示交易與申報結果。`;
 
 type WorkflowAction = "chat" | "precheck" | "broker_quote" | "payment";
@@ -185,7 +187,7 @@ export async function POST(request: Request) {
         ,
         {
           name: "verify_uploaded_vlei_documents",
-          description: "驗證目前訂單所有符合 VLEIJSON-1.0 signed envelope 格式的已上傳 JSON 文件。文件類型不限，且原始 signed envelope 不會經過模型重建。",
+          description: "驗證目前訂單所有符合 VLEIJSON-1.0 signed envelope 格式的已上傳 JSON 文件。出口商提供的文件會強制比對訂單出口商 LEI，且原始 signed envelope 不會經過模型重建。",
           inputSchema: { type: "object", properties: {}, additionalProperties: false }
         }
       ];
@@ -209,6 +211,8 @@ export async function POST(request: Request) {
           if (name === "verify_uploaded_vlei_documents") {
             if (!body.orderId) throw new Error("驗證已上傳文件時必須提供 orderId");
             if (!hasVleiVerifier) throw new Error("vLEI verifier MCP 未提供 verify_vlei_json");
+            const order = exampleOrders.find(candidate => candidate.orderId === body.orderId);
+            if (!order) throw new Error(`找不到訂單 ${body.orderId} 的 LEI 資訊`);
             const fileOutput = mcpResultText(await mcp.callTool({
               name: "get_order_files",
               arguments: { orderId: body.orderId }
@@ -216,14 +220,20 @@ export async function POST(request: Request) {
             const files = parseUploadedFiles(fileOutput)
               .filter(file => isVleiEnvelopeCandidate(file.content));
             if (files.length === 0) throw new Error("找不到符合 VLEIJSON-1.0 signed envelope 格式的已上傳文件");
-            const verificationResults = await Promise.all(files.map(async (file) => ({
-              documentType: file.documentType,
-              filename: file.filename,
-              result: JSON.parse(mcpResultText(await vleiMcp.callTool({
-                name: "verify_vlei_json",
-                arguments: { envelope: file.content }
-              }))) as unknown
-            })));
+            const verificationResults = await Promise.all(files.map(async (file) => {
+              const documentType = documentTypes.find(candidate => candidate.type === file.documentType);
+              const expectedLei = documentType?.providedByExporter ? order.exporter.lei : undefined;
+              return {
+                documentType: file.documentType,
+                filename: file.filename,
+                providedByExporter: documentType?.providedByExporter ?? false,
+                expectedLei,
+                result: JSON.parse(mcpResultText(await vleiMcp.callTool({
+                  name: "verify_vlei_json",
+                  arguments: { envelope: file.content, ...(expectedLei ? { expectedLei } : {}) }
+                }))) as unknown
+              };
+            }));
             return JSON.stringify({ orderId: body.orderId, files: verificationResults });
           }
           if (name === "review_import_documents") {

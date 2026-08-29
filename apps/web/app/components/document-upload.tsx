@@ -1,15 +1,7 @@
 "use client";
 
 import { FormEvent, type ReactNode, useRef, useState } from "react";
-
-const defaultDocumentTypes = [
-  { value: "commercial_invoice", label: "商業發票" },
-  { value: "packing_list", label: "裝箱單" },
-  { value: "bill_of_lading", label: "海運提單" },
-  { value: "certificate_of_origin", label: "產地證明" },
-  { value: "product_specification", label: "產品規格書" },
-  { value: "import_permit", label: "輸入許可證" }
-] as const;
+import documentTypes from "../example-document-types.json";
 
 type UploadResponse = {
   error?: string;
@@ -18,23 +10,20 @@ type UploadResponse = {
 
 export function DocumentUpload({ orderId }: { orderId: string }): ReactNode {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [documentType, setDocumentType] = useState(defaultDocumentTypes[0].value as string);
-  const [customType, setCustomType] = useState("");
+  const [documentType, setDocumentType] = useState(documentTypes[0]?.type ?? "");
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<UploadResponse>();
 
-  const resolvedType = documentType === "custom" ? customType.trim() : documentType;
-
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!resolvedType || files.length === 0) return;
+    if (!documentType || files.length === 0) return;
 
     setUploading(true);
     setResult(undefined);
     const body = new FormData();
     body.set("orderId", orderId);
-    body.set("documentType", resolvedType);
+    body.set("documentType", documentType);
     files.forEach(file => body.append("files", file));
 
     try {
@@ -62,16 +51,13 @@ export function DocumentUpload({ orderId }: { orderId: string }): ReactNode {
         <label>
           文件類型
           <select value={documentType} onChange={event => { setDocumentType(event.target.value); setResult(undefined); }}>
-            {defaultDocumentTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
-            <option value="custom">自訂類型</option>
+            {documentTypes.map(document => (
+              <option key={document.type} value={document.type}>
+                {document.label}{document.providedByExporter ? "（出口商提供）" : ""}
+              </option>
+            ))}
           </select>
         </label>
-        {documentType === "custom" && (
-          <label>
-            自訂類型代碼
-            <input value={customType} onChange={event => setCustomType(event.target.value)} placeholder="例如：insurance_policy" pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}" required />
-          </label>
-        )}
         <label className="file-picker">
           JSON 檔案（最多 20 個，每個 5 MB）
           <input ref={inputRef} type="file" accept="application/json,.json" multiple required
@@ -82,7 +68,7 @@ export function DocumentUpload({ orderId }: { orderId: string }): ReactNode {
             {files.map((file, index) => <li key={`${file.name}-${index}`}><span>{file.name}</span><small>{(file.size / 1024).toFixed(1)} KB</small></li>)}
           </ul>
         )}
-        <button disabled={uploading || !resolvedType || files.length === 0}>
+        <button disabled={uploading || !documentType || files.length === 0}>
           {uploading ? "上傳中…" : `上傳 ${files.length || ""} 個檔案`}
         </button>
       </form>

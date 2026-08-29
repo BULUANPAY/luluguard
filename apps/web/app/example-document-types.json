@@ -1,0 +1,44 @@
+[
+  {
+    "type": "commercial_invoice",
+    "label": "商業發票",
+    "detail": "品名、價格、交易條件",
+    "required": true,
+    "providedByExporter": true
+  },
+  {
+    "type": "packing_list",
+    "label": "裝箱單",
+    "detail": "件數、毛重與淨重",
+    "required": true,
+    "providedByExporter": true
+  },
+  {
+    "type": "bill_of_lading",
+    "label": "海運提單",
+    "detail": "運送與提貨資料",
+    "required": true,
+    "providedByExporter": true
+  },
+  {
+    "type": "certificate_of_origin",
+    "label": "產地證明",
+    "detail": "產地與優惠稅率佐證",
+    "required": false,
+    "providedByExporter": true
+  },
+  {
+    "type": "product_specification",
+    "label": "產品規格書",
+    "detail": "型號、材質與用途",
+    "required": false,
+    "providedByExporter": true
+  },
+  {
+    "type": "import_permit",
+    "label": "輸入許可證",
+    "detail": "受管制商品適用",
+    "required": false,
+    "providedByExporter": false
+  }
+]
