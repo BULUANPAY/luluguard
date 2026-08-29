@@ -1,6 +1,6 @@
 {
   "name": "@luluguard/web",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,10 @@
     "start": "next start"
   },
   "dependencies": {
+    "@google/genai": "^2.19.0",
+    "@modelcontextprotocol/sdk": "^1.17.3",
     "next": "16.3.2",
+    "openai": "^5.19.1",
     "react": "19.1.1",
     "react-dom": "19.1.1"
   },
