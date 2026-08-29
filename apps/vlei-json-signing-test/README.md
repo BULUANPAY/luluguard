@@ -14,6 +14,13 @@
 pnpm --filter @repo/vlei-json-signing-test test-vlei
 ```
 
+也可驗證 script 內既有的 envelope。這個流程使用 static `verifyJson()`，只需要
+預期的 root AID，不讀取 `VLEI_ROOT_SEED` 或 signing state：
+
+```sh
+pnpm --filter @repo/vlei-json-signing-test test-vlei-verify
+```
+
 若未設定 `VLEI_ROOT_SEED`，script 會顯示警告並使用固定的本機 smoke-test-only
 seed；這個 fallback 不可用於正式環境。LEI 由 script 在呼叫 `signJson` 時帶入。
 Script 會自動載入 repository root 的 `.env`。若尚未建立，可從範例建立：

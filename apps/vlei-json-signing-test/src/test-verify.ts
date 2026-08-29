@@ -1,15 +1,6 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { VleiJsonSigning } from "@repo/vlei-json-signing";
 
-if (!process.env.VLEI_ROOT_SEED) {
-  process.env.VLEI_ROOT_SEED = "local-smoke-test-only-seed";
-  console.warn(
-    "VLEI_ROOT_SEED is not set; using a local smoke-test-only seed.",
-  );
-}
-
+const EXPECTED_ROOT_AID = "FCIErP8b3nCca-rMn5LW4Tf2GzfUB67pdc5OjrhpMWkT";
 
 const envelope = JSON.parse(`{
     "v": "VLEIJSON10",
@@ -232,26 +223,10 @@ const envelope = JSON.parse(`{
         ]
     },
     "signerId": "signer-d899a1a276bbfd22510b773e5addb7a1"
-}`)
+}`);
 
-const repositoryRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../..",
-);
-
-const stateDir = path.resolve(
-  repositoryRoot,
-  process.env.VLEI_STATE_DIR ?? ".vlei-json-signing",
-);
-
-const signing = new VleiJsonSigning({
-  stateDir,
-});
-
-const { rootAid } = await signing.initialize();
-
-const verification = await signing.verifyJson(envelope, {
-  expectedRootAid: rootAid,
+const verification = await VleiJsonSigning.verifyJson(envelope, {
+  expectedRootAid: EXPECTED_ROOT_AID,
 });
 
 if (!verification.valid) {
