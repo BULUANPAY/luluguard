@@ -44,3 +44,24 @@ test("blocks payment when broker duty rate differs from local mock tariff profil
     ),
   );
 });
+
+test("blocks an internally consistent quote with incorrect calculated charges", () => {
+  const review = reviewImportQuote(
+    getMockExportDocuments("REVIEW"),
+    {
+      ...validDutyQuote,
+      dutyUsd: 1_512.5,
+      taxUsd: 1_488.13,
+      totalEstimatedUsd: 3_013.94,
+    },
+    0.01,
+  );
+
+  assert.equal(review.paymentAllowed, false);
+  assert.ok(
+    review.findings.some((finding) => finding.code === "DUTY_AMOUNT_MISMATCH"),
+  );
+  assert.ok(
+    review.findings.some((finding) => finding.code === "VAT_AMOUNT_MISMATCH"),
+  );
+});
