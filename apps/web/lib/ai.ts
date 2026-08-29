@@ -15,13 +15,15 @@ export interface ChatMessage {
 
 interface GenerateAnswerOptions {
   traceId: string;
+  agentRunId: string;
+  identity: { tenantId: string; userId: string; sessionId: string };
   messages: ChatMessage[];
   instructions: string;
   tools: AiTool[];
   callTool: (name: string, args: Record<string, unknown>) => Promise<string>;
 }
 
-const maxToolRounds = 30;
+const maxToolRounds = 100;
 
 export async function generateAiAnswer(
   options: GenerateAnswerOptions,
@@ -35,6 +37,9 @@ export async function generateAiAnswer(
     action: "agent.run",
     status: "attempted",
     actor: "user",
+    ...options.identity,
+    agentId: "luluguard-importer-agent",
+    agentRunId: options.agentRunId,
     data: {
       provider,
       messages: options.messages,

@@ -83,10 +83,14 @@ async function runBridge<T>(
     arguments_.push("--state-dir", options.stateDir);
   }
 
-  const child = spawn(options.pythonExecutable ?? "python3", arguments_, {
-    env: process.env,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  const child = spawn(
+    /* turbopackIgnore: true */ options.pythonExecutable ?? "python3",
+    arguments_,
+    {
+      env: process.env,
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
   child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
   child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
   child.stdin.end(request);

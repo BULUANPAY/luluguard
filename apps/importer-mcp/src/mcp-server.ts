@@ -10,9 +10,15 @@ import { config } from "./config.js";
 import { createX402PaidFetch } from "./payment/client.js";
 import type { PaymentRecord } from "./payment/policy.js";
 import { PolicyStore, type PolicyUpdate } from "./policy/policy-store.js";
-import { newAuditId, writeAudit } from "./audit.js";
+import { clearAuditTraceContext, newAuditId, writeAudit } from "./audit.js";
+import {
+  verifyAgentAuthorization,
+  type VerifiedAgentAuthorization,
+} from "./vlei-authorization.js";
 import { getOrderFiles } from "./order-files.js";
+import { buildExportDocumentsFromUploads } from "./order-documents.js";
 
+const uploadedFilesRoot = path.resolve(process.cwd(), "../..", "uploaded-files");
 const preflightStore = new Map();
 const quoteStore = new Map();
 const paymentHistory: PaymentRecord[] = [];
@@ -30,7 +36,10 @@ function createServer(traceId = newAuditId("TRACE")) {
     version: "0.4.0",
   });
 
-  const createAgent = async (paid: boolean) => {
+  const createAgent = async (
+    paid: boolean,
+    identity: VerifiedAgentAuthorization,
+  ) => {
     if (paid) policyStore.assertPaymentEnabled();
     const paidFetch = paid ? await createX402PaidFetch() : globalThis.fetch;
     return new ImporterAgent(
@@ -45,6 +54,7 @@ function createServer(traceId = newAuditId("TRACE")) {
       quoteStore,
       paymentHistory,
       traceId,
+      identity,
     );
   };
 
@@ -61,8 +71,7 @@ function createServer(traceId = newAuditId("TRACE")) {
       log("info", "mcp-server", "tool.called", { tool: "get_order_files", orderId, documentTypes });
       try {
         policyStore.assertAgentEnabled();
-        const storageRoot = path.resolve(process.cwd(), "../..", "uploaded-files");
-        const files = await getOrderFiles(storageRoot, orderId, documentTypes);
+        const files = await getOrderFiles(uploadedFilesRoot, orderId, documentTypes);
         const result = { orderId, fileCount: files.length, files };
         log("info", "mcp-server", "tool.completed", { tool: "get_order_files", orderId, fileCount: files.length });
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
@@ -78,28 +87,19 @@ function createServer(traceId = newAuditId("TRACE")) {
     "review_import_documents",
     {
       description:
-        "在進口商端檢查使用者勾選的 mock 文件並產生獨立費用預估。此工具不會聯絡報關行、不會付款。",
+        "讀取訂單目前已上傳的文件並產生獨立費用預估。此工具不會聯絡報關行、不會付款。",
       inputSchema: {
         orderId: z
           .string()
           .min(1)
           .describe("進口商內部訂單編號，不會傳給報關行"),
-        documentTypes: z
-          .array(
-            z.enum([
-              "commercial_invoice",
-              "packing_list",
-              "bill_of_lading",
-              "certificate_of_origin",
-              "product_specification",
-              "import_permit",
-            ]),
-          )
-          .min(1)
-          .describe("使用者在前端勾選的 mock 文件"),
+        authorization: z
+          .record(z.unknown())
+          .optional()
+          .describe("Web 後端注入的 sandbox vLEI Agent Authorization"),
       },
     },
-    async ({ orderId, documentTypes }) => {
+    async ({ orderId, authorization }) => {
       const toolCallId = newAuditId("MCP-CALL");
       writeAudit({
         traceId,
@@ -110,19 +110,25 @@ function createServer(traceId = newAuditId("TRACE")) {
         actor: "ai-agent",
         data: {
           tool: "review_import_documents",
-          arguments: { orderId, documentTypes },
+          arguments: { orderId },
         },
       });
       log("info", "mcp-server", "tool.called", {
         tool: "review_import_documents",
         orderId,
-        documentTypes,
       });
       try {
+        const identity = await verifyAgentAuthorization({
+          authorization,
+          traceId,
+          action: "precheck",
+          resource: { orderId },
+        });
         policyStore.assertAgentEnabled();
-        const result = (await createAgent(false)).precheck(
+        const documents = await buildExportDocumentsFromUploads(uploadedFilesRoot, orderId);
+        const result = (await createAgent(false, identity)).precheck(
           orderId,
-          documentTypes,
+          documents,
         );
         log("info", "mcp-server", "tool.completed", {
           tool: "review_import_documents",
@@ -140,7 +146,7 @@ function createServer(traceId = newAuditId("TRACE")) {
           actor: "importer-agent",
           data: {
             tool: "review_import_documents",
-            arguments: { orderId, documentTypes },
+            arguments: { orderId },
             result,
           },
         });
@@ -165,7 +171,7 @@ function createServer(traceId = newAuditId("TRACE")) {
           actor: "importer-agent",
           data: {
             tool: "review_import_documents",
-            arguments: { orderId, documentTypes },
+            arguments: { orderId },
             error,
           },
         });
@@ -190,9 +196,13 @@ function createServer(traceId = newAuditId("TRACE")) {
         estimateApproved: z
           .boolean()
           .describe("使用者是否已按下確認預估並詢價按鈕"),
+        authorization: z
+          .record(z.unknown())
+          .optional()
+          .describe("Web 後端注入的 sandbox vLEI Agent Authorization"),
       },
     },
-    async ({ preflightId, estimateApproved }) => {
+    async ({ preflightId, estimateApproved, authorization }) => {
       const toolCallId = newAuditId("MCP-CALL");
       writeAudit({
         traceId,
@@ -212,9 +222,15 @@ function createServer(traceId = newAuditId("TRACE")) {
         estimateApproved,
       });
       try {
+        const identity = await verifyAgentAuthorization({
+          authorization,
+          traceId,
+          action: "broker_quote",
+          resource: { preflightId, estimateApproved },
+        });
         policyStore.assertAgentEnabled();
         const result = await (
-          await createAgent(false)
+          await createAgent(false, identity)
         ).getQuote(preflightId, estimateApproved);
         log("info", "mcp-server", "tool.completed", {
           tool: "get_import_quote",
@@ -281,9 +297,13 @@ function createServer(traceId = newAuditId("TRACE")) {
           .boolean()
           .default(false)
           .describe("是否已取得人工付款核准"),
+        authorization: z
+          .record(z.unknown())
+          .optional()
+          .describe("Web 後端注入的 sandbox vLEI Agent Authorization"),
       },
     },
-    async ({ orderId, quoteId, humanApproved }) => {
+    async ({ orderId, quoteId, humanApproved, authorization }) => {
       const toolCallId = newAuditId("MCP-CALL");
       writeAudit({
         traceId,
@@ -304,8 +324,14 @@ function createServer(traceId = newAuditId("TRACE")) {
         humanApproved,
       });
       try {
+        const identity = await verifyAgentAuthorization({
+          authorization,
+          traceId,
+          action: "payment",
+          resource: { orderId, quoteId, humanApproved },
+        });
         const result = await (
-          await createAgent(true)
+          await createAgent(true, identity)
         ).submit(orderId, quoteId, humanApproved);
         log("info", "mcp-server", "tool.completed", {
           tool: "submit_import_declaration",
@@ -390,7 +416,7 @@ app.use((req, res, next) => {
       body: req.body,
     },
   });
-  res.on("finish", () =>
+  res.on("finish", () => {
     writeAudit({
       traceId,
       spanId: requestId,
@@ -404,8 +430,9 @@ app.use((req, res, next) => {
         statusCode: res.statusCode,
         durationMs: Date.now() - startedAt,
       },
-    }),
-  );
+    });
+    clearAuditTraceContext(traceId);
+  });
   next();
 });
 app.get("/health", (_req, res) =>
@@ -475,11 +502,9 @@ app.put("/admin/policy", (req, res) => {
     });
     res.json({ policy: changed.current });
   } catch (error) {
-    res
-      .status(400)
-      .json({
-        error: error instanceof Error ? error.message : "Invalid policy",
-      });
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Invalid policy",
+    });
   }
 });
 

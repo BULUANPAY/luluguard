@@ -13,12 +13,39 @@ export interface AuditEvent {
   actor?: string;
   spanId?: string;
   parentSpanId?: string;
+  tenantId?: string;
+  userId?: string;
+  sessionId?: string;
+  agentId?: string;
+  agentRunId?: string;
   data?: unknown;
 }
 
 const secretKey =
   /(authorization|api[-_]?key|private[-_]?key|secret|password|cookie|token|payment[-_]?signature)/i;
 let previousHash: string | undefined;
+type AuditIdentity = Pick<
+  AuditEvent,
+  "tenantId" | "userId" | "sessionId" | "agentId" | "agentRunId"
+>;
+const traceIdentities = new Map<string, AuditIdentity>();
+
+function traceIdentity(event: AuditEvent): AuditIdentity {
+  const known = traceIdentities.get(event.traceId) ?? {};
+  const identity = {
+    tenantId: event.tenantId ?? known.tenantId,
+    userId: event.userId ?? known.userId,
+    sessionId: event.sessionId ?? known.sessionId,
+    agentId: event.agentId ?? known.agentId,
+    agentRunId: event.agentRunId ?? known.agentRunId,
+  };
+  traceIdentities.set(event.traceId, identity);
+  return identity;
+}
+
+export function clearAuditTraceContext(traceId: string) {
+  traceIdentities.delete(traceId);
+}
 
 function sanitize(
   value: unknown,
@@ -74,6 +101,7 @@ export function writeAudit(event: AuditEvent) {
     auditId: newAuditId("AUDIT"),
     service: "luluguard-importer-mcp",
     ...event,
+    ...traceIdentity(event),
     data: sanitize(event.data),
     previousHash: previousHash ?? "GENESIS",
   };

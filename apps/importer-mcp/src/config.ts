@@ -24,6 +24,10 @@ export const config = {
   importer: {
     address: process.env.IMPORTER_ADDRESS ?? "",
     privateKey: process.env.IMPORTER_PRIVATE_KEY ?? "",
+    lei: process.env.IMPORTER_LEI ?? "8755001ELOZEL05BVX22",
+  },
+  vlei: {
+    expectedRootAid: process.env.VLEI_EXPECTED_ROOT_AID ?? "",
   },
   signer: {
     provider: process.env.SIGNER_PROVIDER ?? "private-key",

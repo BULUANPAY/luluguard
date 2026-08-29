@@ -7,12 +7,7 @@ import type {
   CustomsQuoteResponse,
   DutyQuote,
   ExportDocuments,
-  TradeDocumentType,
 } from "./domain.js";
-import {
-  defaultMockDocumentTypes,
-  getMockExportDocuments,
-} from "./mock-exporter.js";
 import { log } from "./logger.js";
 import {
   assertPaymentAllowed,
@@ -30,6 +25,7 @@ import {
 } from "./document-review.js";
 import { estimateImportCosts, type ImportEstimate } from "./import-estimate.js";
 import { newAuditId, writeAudit, type AuditStatus } from "./audit.js";
+import type { VerifiedAgentAuthorization } from "./vlei-authorization.js";
 
 export interface PreflightResult {
   preflightId: string;
@@ -74,6 +70,7 @@ export class ImporterAgent {
     private readonly quoteStore = new Map<string, QuoteResult>(),
     private readonly paymentHistory: PaymentRecord[] = [],
     private readonly traceId = newAuditId("TRACE"),
+    private readonly identity?: VerifiedAgentAuthorization,
   ) {}
 
   private audit(
@@ -88,29 +85,30 @@ export class ImporterAgent {
       component: "importer-agent",
       action,
       status,
-      actor: "importer-agent",
+      actor: this.identity?.userId ?? "importer-agent",
+      tenantId: this.identity?.tenantId,
+      userId: this.identity?.userId,
+      sessionId: this.identity?.sessionId,
+      agentId: "luluguard-importer-agent",
+      agentRunId: this.identity?.agentRunId,
       data,
     });
   }
 
-  precheck(
-    orderId: string,
-    selectedDocuments: TradeDocumentType[] = defaultMockDocumentTypes,
-  ): PreflightResult {
+  precheck(orderId: string, documents: ExportDocuments): PreflightResult {
     const audit: string[] = [];
     const preflightId = `PREFLIGHT-${randomUUID()}`;
     this.audit(
       "preflight.review",
       "attempted",
-      { orderId, selectedDocuments },
+      { orderId, providedDocuments: documents.providedDocuments },
       preflightId,
     );
     log("info", "importer-agent", "preflight.started", {
       orderId,
-      selectedDocuments,
+      providedDocuments: documents.providedDocuments,
     });
-    const documents = getMockExportDocuments(orderId, selectedDocuments);
-    audit.push("Fetched selected mock export documents locally");
+    audit.push("Loaded export documents from the order's uploaded files");
     const documentReview = reviewDocumentsBeforeTransmission(documents);
     audit.push(
       `Document review completed; readyToTransmit=${documentReview.readyToTransmit}`,
@@ -136,7 +134,7 @@ export class ImporterAgent {
     this.audit(
       "preflight.review",
       "succeeded",
-      { input: { orderId, selectedDocuments }, result },
+      { input: { orderId, providedDocuments: documents.providedDocuments }, result },
       preflightId,
     );
     log(

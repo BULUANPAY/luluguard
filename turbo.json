@@ -2,6 +2,7 @@
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
   "globalEnv": [
+    "NODE_ENV",
     "AI_PROVIDER",
     "GEMINI_API_KEY",
     "GEMINI_MODEL",
@@ -36,7 +37,9 @@
     "AUDIT_LOG_MAX_VALUE_LENGTH",
     "VLEI_ROOT_SEED",
     "VLEI_STATE_DIR",
-    "VLEI_SIGNING_API_PORT",
+    "VLEI_EXPECTED_ROOT_AID",
+    "IMPORTER_LEI",
+    "SANDBOX_SESSION_SECRET",
     "VLEI_SIGNING_ALLOWED_ORIGIN",
     "VITE_VLEI_SIGNING_API_URL",
     "VITE_VLEI_SIGNING_LEI"

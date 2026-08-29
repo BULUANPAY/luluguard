@@ -12,6 +12,11 @@ export interface AuditEvent {
   actor?: string;
   spanId?: string;
   parentSpanId?: string;
+  tenantId?: string;
+  userId?: string;
+  sessionId?: string;
+  agentId?: string;
+  agentRunId?: string;
   data?: unknown;
 }
 
@@ -24,6 +29,28 @@ const auditPath =
 const enabled = process.env.AUDIT_LOG_ENABLED !== "false";
 const maxValueLength = Number(process.env.AUDIT_LOG_MAX_VALUE_LENGTH ?? 8_000);
 let previousHash: string | undefined;
+type AuditIdentity = Pick<
+  AuditEvent,
+  "tenantId" | "userId" | "sessionId" | "agentId" | "agentRunId"
+>;
+const traceIdentities = new Map<string, AuditIdentity>();
+
+function traceIdentity(event: AuditEvent): AuditIdentity {
+  const known = traceIdentities.get(event.traceId) ?? {};
+  const identity = {
+    tenantId: event.tenantId ?? known.tenantId,
+    userId: event.userId ?? known.userId,
+    sessionId: event.sessionId ?? known.sessionId,
+    agentId: event.agentId ?? known.agentId,
+    agentRunId: event.agentRunId ?? known.agentRunId,
+  };
+  traceIdentities.set(event.traceId, identity);
+  return identity;
+}
+
+export function clearAuditTraceContext(traceId: string) {
+  traceIdentities.delete(traceId);
+}
 
 function sanitize(
   value: unknown,
@@ -55,8 +82,14 @@ function sanitize(
 }
 
 function loadPreviousHash() {
-  if (previousHash !== undefined || !existsSync(auditPath)) return;
-  const lines = readFileSync(auditPath, "utf8").trim().split("\n");
+  if (
+    previousHash !== undefined ||
+    !existsSync(/* turbopackIgnore: true */ auditPath)
+  )
+    return;
+  const lines = readFileSync(/* turbopackIgnore: true */ auditPath, "utf8")
+    .trim()
+    .split("\n");
   if (!lines.at(-1)) return;
   try {
     previousHash =
@@ -79,6 +112,7 @@ export function writeAudit(event: AuditEvent) {
     auditId: newAuditId("AUDIT"),
     service: "luluguard-web",
     ...event,
+    ...traceIdentity(event),
     data: sanitize(event.data),
     previousHash: previousHash ?? "GENESIS",
   };

@@ -29,6 +29,9 @@ importers:
       '@noble/curves':
         specifier: ^1.9.7
         version: 1.9.7
+      '@repo/vlei-json-signing':
+        specifier: workspace:*
+        version: link:../../packages/vlei-json-signing
       '@x402/core':
         specifier: ^2.23.0
         version: 2.24.0
@@ -247,6 +250,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.17.3
         version: 1.30.0(zod@4.4.3)
+      '@repo/vlei-json-signing':
+        specifier: workspace:*
+        version: link:../../packages/vlei-json-signing
       next:
         specifier: 16.3.2
         version: 16.3.2(@babel/core@7.29.7)(@types/node@24.13.3)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
