@@ -11,30 +11,30 @@ const envelope = JSON.parse(`{
         "v": "VLEIJSON10",
         "payloadDigest": "FNEHziMvVRMx-eISG8ly6qiU_82QIScHOddm_OgS0Fbv",
         "lei": "8755001ELOZEL05BVX22",
-        "signerAid": "FPf7f4LEMtnafec0r0P3hzEz1ji9ihE4R3VLUn582eO-",
-        "signerCredentialSaid": "FDdB8SwXGOEZLdXIFV0HgIIpP0bPXkL31rNYcR0wBRm0",
-        "signedAt": "2026-08-29T05:07:31.645Z"
+        "signerAid": "FAOrOTz-3P8q-GORnzN7gTJhYVv2a23gQPs98u56aKX8",
+        "signerCredentialSaid": "FKWf63M7dj8WT1fLhCusrGDkqsjBaUq_Mke1LUvtyHYy",
+        "signedAt": "2026-08-29T05:45:27.292Z"
     },
-    "signature": "0BADG17ouY4MCxOX_L7-tF36AhB1wbVHApU9t1dR-h9YoTZrVQyZCSKJHiIBv2ikGeaVxObllzRQS8-xc09-V4gA",
+    "signature": "0BCxcNv-zmV1FfC93WmzoVc0oVgM04sVQ6Ad2fv0gtg1nEzToB_PcjYErpJ69Pw-sXbXLcIi8nGVAbmVkf622kAB",
     "signer": {
         "credential": {
-            "v": "ACDC10JSON0001f1_",
-            "d": "FDdB8SwXGOEZLdXIFV0HgIIpP0bPXkL31rNYcR0wBRm0",
+            "v": "ACDC10JSON0001d4_",
+            "d": "FKWf63M7dj8WT1fLhCusrGDkqsjBaUq_Mke1LUvtyHYy",
             "i": "FCIErP8b3nCca-rMn5LW4Tf2GzfUB67pdc5OjrhpMWkT",
             "ri": "FAVJCFe_XPlHilO9Sr1kw4g4bHSQdc0imqEj1pZaBFOl",
             "s": "FEMIF0lmNSYaNF6B_9pJcfz4ByF5BYq_93-nYpIn8E90",
             "a": {
-                "d": "FCExb5GAvGOwqaQlh2i5Nfw4q0g1GhXgugBMt-s2GQiz",
-                "i": "FPf7f4LEMtnafec0r0P3hzEz1ji9ihE4R3VLUn582eO-",
-                "dt": "2026-08-29T05:07:31.431450+00:00",
-                "signerId": "signer-d899a1a276bbfd22510b773e5addb7a1",
+                "d": "FF4TJn0SjckqHZcM-4s6t8HVeOaCNhSFZPEEuA-8b8MI",
+                "i": "FAOrOTz-3P8q-GORnzN7gTJhYVv2a23gQPs98u56aKX8",
+                "dt": "2026-08-29T05:43:35.640585+00:00",
+                "signerId": "signer-ef6e6b1c3cd42537affc63a9d3376f82",
                 "info": {
-                    "name": "LuLuGuard Test Signer",
-                    "role": "Integration Test"
+                    "name": "CT",
+                    "role": "Tester"
                 }
             }
         },
-        "credentialSignature": "0BDDNT2nJbg3TLxRVkM55cTR06AEa0Pv242RyER-j4MdPy4YsQn9BqzfNoJmCZOlyVR4sZinJRYuSxQcZA4lolAK",
+        "credentialSignature": "0BAfnTzYVkc9kyRhwvHoUp-N_Do72A7P79G0X__lAic7e_v5htgjYM_8ppiggnA24tV-jLILdGpQkcbhkLPz0d8F",
         "rootKeyAtIssuance": "DOlpS2JUOaOMGYgu-H4oMP_ra7TUmm_vVyTnNQZFAvYU"
     },
     "proof": {
@@ -169,6 +169,24 @@ const envelope = JSON.parse(`{
                     ]
                 },
                 "sig": "0BACiVk9EzoNqRcDYjTLkMjGxKHwapzzWUKJWgyjUly7CDMmneTyTBwofGJn5O4-SZPeWU9Hw-wuueQwkdBsrDQA"
+            },
+            {
+                "event": {
+                    "v": "KERI10JSON00013a_",
+                    "t": "ixn",
+                    "d": "FDafMYjB28xDgZTrm4S3LjmR1JIcli0HTMgi7hFB_C4C",
+                    "i": "FCIErP8b3nCca-rMn5LW4Tf2GzfUB67pdc5OjrhpMWkT",
+                    "s": "7",
+                    "p": "FBuksE8n6aaW7jp0B_VqHH4zUG6ysDnXixvYwEWIyL_M",
+                    "a": [
+                        {
+                            "i": "FKWf63M7dj8WT1fLhCusrGDkqsjBaUq_Mke1LUvtyHYy",
+                            "s": "0",
+                            "d": "FN0_QJbnZslnTghblym10-Fsxv2m3Jww2IPPHR6S_faz"
+                        }
+                    ]
+                },
+                "sig": "0BBhaF8MHFsroS6X8r8q96t0ARZo4yZT4GFJj4yxBgRpJe9xWX8SQyoxFKPqWh7IE8YS0shvh2yj4FyiqXXBlZkC"
             }
         ],
         "signerKel": [
@@ -176,16 +194,16 @@ const envelope = JSON.parse(`{
                 "event": {
                     "v": "KERI10JSON00015f_",
                     "t": "dip",
-                    "d": "FPf7f4LEMtnafec0r0P3hzEz1ji9ihE4R3VLUn582eO-",
-                    "i": "FPf7f4LEMtnafec0r0P3hzEz1ji9ihE4R3VLUn582eO-",
+                    "d": "FAOrOTz-3P8q-GORnzN7gTJhYVv2a23gQPs98u56aKX8",
+                    "i": "FAOrOTz-3P8q-GORnzN7gTJhYVv2a23gQPs98u56aKX8",
                     "s": "0",
                     "kt": "1",
                     "k": [
-                        "DK2uwf7NIVADrY_IrxwHpsbJRkcvf_ZeA-_oItW6Hfb0"
+                        "DJ2mgSIItWEpzZ8G9Z_EFK34gI_WCg16Sp-Brn74-xAN"
                     ],
                     "nt": "1",
                     "n": [
-                        "FI1rQQr9QpLxmUcEYg9LF4u1Rdu6hvks9vyKgGpwg2Io"
+                        "FEoyzJ4cI1DoJDkFNkl8ElO-1AEWr1hzrBnpHC6G6Mkw"
                     ],
                     "bt": "0",
                     "b": [],
@@ -193,7 +211,7 @@ const envelope = JSON.parse(`{
                     "a": [],
                     "di": "FCIErP8b3nCca-rMn5LW4Tf2GzfUB67pdc5OjrhpMWkT"
                 },
-                "sig": "0BCXEb85vt0qmIFgdU8N9PwGtBZagZhnrXIOjiJFsupE4mMvhfbuLiYWGzQYVXL453zkYMy2qQ15WQCjgL0U_REP"
+                "sig": "0BDL1Rtf6IQP_ebWN6-3c_7rfEAi8PaVHl8PNuBH6XwTQfOrXevucgGAV4JkoFDy22X372GAh_fr4M2ucIobs4EJ"
             }
         ],
         "registry": {
@@ -214,15 +232,15 @@ const envelope = JSON.parse(`{
             {
                 "v": "KERI10JSON0000ed_",
                 "t": "iss",
-                "d": "FGRX9K40mPFihC8Q4ogIEQzjAsZR57MMH5IY57W_oHra",
-                "i": "FDdB8SwXGOEZLdXIFV0HgIIpP0bPXkL31rNYcR0wBRm0",
+                "d": "FN0_QJbnZslnTghblym10-Fsxv2m3Jww2IPPHR6S_faz",
+                "i": "FKWf63M7dj8WT1fLhCusrGDkqsjBaUq_Mke1LUvtyHYy",
                 "s": "0",
                 "ri": "FAVJCFe_XPlHilO9Sr1kw4g4bHSQdc0imqEj1pZaBFOl",
-                "dt": "2026-08-29T05:07:31.432236+00:00"
+                "dt": "2026-08-29T05:43:35.644709+00:00"
             }
         ]
     },
-    "signerId": "signer-d899a1a276bbfd22510b773e5addb7a1"
+    "signerId": "signer-ef6e6b1c3cd42537affc63a9d3376f82"
 }`);
 
 const verification = await VleiJsonSigning.verifyJson(envelope, {
@@ -234,5 +252,7 @@ if (!verification.valid) {
   process.exitCode = 1;
 } else {
   console.log("Verification: PASS");
+  console.log("Verified LEI:", verification.lei);
   console.log("Verified signer info:", verification.signer.info);
+  console.log("Verified payload:\n", JSON.stringify(verification.payload, null, 2));
 }
