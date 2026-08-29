@@ -41,6 +41,10 @@ test("same seed produces the same root AID without persisting the seed", async (
   const firstRoot = await first.client.initialize();
   const secondRoot = await second.client.initialize();
   assert.equal(firstRoot.rootAid, secondRoot.rootAid);
+  assert.equal(
+    await VleiJsonSigning.deriveRootAid(ROOT_SEED_A),
+    firstRoot.rootAid,
+  );
 
   const stateText = await readFile(
     path.join(first.stateDir, "state.json"),
@@ -70,6 +74,15 @@ test("accepts short, long, and Unicode root seed strings", async () => {
     ),
   );
   assert.equal(new Set(roots).size, seeds.length);
+});
+
+test("static root AID derivation rejects an empty seed", async () => {
+  await assert.rejects(
+    VleiJsonSigning.deriveRootAid(""),
+    (error: unknown) =>
+      error instanceof VleiJsonSigningError &&
+      error.code === "ROOT_SEED_INVALID",
+  );
 });
 
 test("creates an idempotent signer and rejects conflicting signer info", async () => {
@@ -104,7 +117,7 @@ test("signs and verifies arbitrary JSON and returns root-authorized signer info"
     payload,
   });
   const transferred = JSON.parse(JSON.stringify(envelope)) as typeof envelope;
-  const result = await client.verifyJson(transferred, {
+  const result = await VleiJsonSigning.verifyJson(transferred, {
     expectedRootAid: rootAid,
   });
   assert.equal(result.valid, true);
@@ -114,6 +127,30 @@ test("signs and verifies arbitrary JSON and returns root-authorized signer info"
     assert.equal(result.lei, VALID_LEI);
     assert.deepEqual(result.signer.info, signer.info);
   }
+});
+
+test("static verification requires only the expected root AID", async () => {
+  const { client, envName } = await service();
+  const rootAid = (await client.initialize()).rootAid;
+  await client.createSigner({ id: "alice", info: { role: "Approver" } });
+  const envelope = await client.signJson({
+    signerId: "alice",
+    lei: VALID_LEI,
+    payload: { amount: 42 },
+  });
+  delete process.env[envName];
+
+  const result = await VleiJsonSigning.verifyJson(envelope, {
+    expectedRootAid: rootAid,
+  });
+  assert.equal(result.valid, true);
+
+  await assert.rejects(
+    VleiJsonSigning.verifyJson(envelope, { expectedRootAid: "" }),
+    (error: unknown) =>
+      error instanceof VleiJsonSigningError &&
+      error.code === "EXPECTED_ROOT_REQUIRED",
+  );
 });
 
 test("object key order does not affect verification", async () => {

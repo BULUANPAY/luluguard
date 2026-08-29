@@ -68,3 +68,12 @@ export interface VleiJsonSigningOptions {
   pythonExecutable?: string;
   rootSeedEnvName?: string;
 }
+
+export interface VleiStaticOptions {
+  pythonExecutable?: string;
+}
+
+export interface VleiVerifyOptions extends VleiStaticOptions {
+  expectedRootAid: string;
+  expectedLei?: string;
+}

@@ -48,6 +48,11 @@ import { VleiJsonSigning } from "@repo/vlei-json-signing";
 const signing = new VleiJsonSigning();
 const { rootAid } = await signing.initialize();
 
+// 也可只用 seed 推導 AID，不會建立或讀取 state directory。
+const derivedRootAid = await VleiJsonSigning.deriveRootAid(
+  process.env.VLEI_ROOT_SEED!,
+);
+
 await signing.createSigner({
   id: "alice",
   info: {
@@ -67,7 +72,9 @@ const envelope = await signing.signJson({
   },
 });
 
-const result = await signing.verifyJson(envelope, {
+// Static verification 只使用 envelope 內的 proof 與呼叫端信任的 root AID，
+// 不需要 root seed 或 STATE_DIR。
+const result = await VleiJsonSigning.verifyJson(envelope, {
   expectedRootAid: rootAid,
   expectedLei: "8755001ELOZEL05BVX22",
 });
@@ -80,8 +87,12 @@ if (result.valid) {
 }
 ```
 
-驗證服務只需要公開的 `rootAid`，不需要 root seed。若未傳入
-`expectedRootAid`，package 會從設定的 root seed 環境變數推導預期 AID。
+`VleiJsonSigning.verifyJson()` 是無狀態的 static method；驗證服務只需要公開的
+`rootAid`，不需要 root seed 或 `STATE_DIR`。instance `verifyJson()` 為向下相容而
+保留，未傳入 `expectedRootAid` 時會從 instance 的 signing state 取得 root AID。
+
+`VleiJsonSigning.deriveRootAid(seed)` 同樣是 static method，接受任意長度的非空
+字串，並且不會建立或讀取 signing state。
 
 ## Envelope
 

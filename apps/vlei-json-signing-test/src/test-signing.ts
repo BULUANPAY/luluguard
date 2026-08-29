@@ -25,6 +25,10 @@ const signing = new VleiJsonSigning({
 });
 
 const { rootAid } = await signing.initialize();
+const derivedRootAid = await VleiJsonSigning.deriveRootAid(
+  process.env.VLEI_ROOT_SEED,
+);
+assert.equal(derivedRootAid, rootAid);
 const lei = "8755001ELOZEL05BVX22";
 
 const signer = await signing.createSigner({
@@ -53,7 +57,7 @@ console.log("Signer:", signer);
 console.log("Signed envelope:");
 console.log(JSON.stringify(envelope, null, 2));
 
-const verification = await signing.verifyJson(envelope, {
+const verification = await VleiJsonSigning.verifyJson(envelope, {
   expectedRootAid: rootAid,
   expectedLei: lei,
 });

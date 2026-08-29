@@ -56,8 +56,12 @@ def read_root_secret(env_name):
     value = os.environ.get(env_name)
     if value is None:
         raise BridgeError("ROOT_SEED_MISSING", f"Environment variable {env_name} is required")
-    if value == "":
-        raise BridgeError("ROOT_SEED_INVALID", f"Environment variable {env_name} must not be empty")
+    return root_secret_from_value(value)
+
+
+def root_secret_from_value(value):
+    if not isinstance(value, str) or value == "":
+        raise BridgeError("ROOT_SEED_INVALID", "Root seed must be a non-empty string")
     return value.encode("utf-8")
 
 
@@ -498,8 +502,7 @@ def expected_root(request, state_dir):
         return explicit
     env_name = request.get("rootSeedEnvName", "VLEI_ROOT_SEED")
     root_secret = read_root_secret(env_name)
-    state_path_value = state_path(state_dir)
-    if os.path.exists(state_path_value):
+    if state_dir is not None and os.path.exists(state_path(state_dir)):
         state = load_state(state_dir)
         return hydrate_root(state, root_secret).aid
     return build_root_controller(root_secret).aid
@@ -509,6 +512,10 @@ def dispatch(request, state_dir):
     command = request.get("command")
     data = request.get("input") or {}
     env_name = request.get("rootSeedEnvName", "VLEI_ROOT_SEED")
+
+    if command == "derive-root-aid":
+        root_secret = root_secret_from_value(data.get("seed"))
+        return {"rootAid": build_root_controller(root_secret).aid}
 
     if command == "verify":
         root_aid = expected_root(request, state_dir)
@@ -529,6 +536,9 @@ def dispatch(request, state_dir):
                     }
                 ],
             }
+
+    if state_dir is None:
+        raise BridgeError("STATE_DIR_REQUIRED", f"Command {command!r} requires a state directory")
 
     root_secret = read_root_secret(env_name)
     if command in ("initialize", "root-aid"):
@@ -552,12 +562,13 @@ def dispatch(request, state_dir):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--sandbox-scripts", required=True)
-    parser.add_argument("--state-dir", required=True)
+    parser.add_argument("--state-dir")
     arguments = parser.parse_args()
     try:
         configure_sandbox(arguments.sandbox_scripts)
         request = json.load(sys.stdin)
-        result = dispatch(request, os.path.abspath(arguments.state_dir))
+        state_dir = os.path.abspath(arguments.state_dir) if arguments.state_dir else None
+        result = dispatch(request, state_dir)
         response = {"ok": True, "result": result}
     except BridgeError as error:
         response = {"ok": False, "error": {"code": error.code, "message": str(error)}}
