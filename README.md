@@ -28,6 +28,8 @@ packages/
 
 - Node.js 24 or newer; `.nvmrc` currently selects Node.js 26
 - pnpm 11.23.0
+- Python 3.8 or newer for vLEI signing and verification
+- The `vendor/vlei-sandbox` Git submodule
 - A Gemini or OpenAI API key
 
 ## Setup
@@ -36,6 +38,7 @@ Install dependencies from the repository root:
 
 ```sh
 nvm use
+git submodule update --init --recursive
 pnpm install
 ```
 
@@ -52,18 +55,18 @@ Both generated files are ignored by Git. Replace every placeholder before testin
 
 Configure `apps/web/.env.local`:
 
-| Variable         | Description                                            |
-| ---------------- | ------------------------------------------------------ |
-| `AI_PROVIDER`    | `gemini` or `openai`                                   |
-| `GEMINI_API_KEY` | Required when using Gemini                             |
-| `GEMINI_MODEL`   | Gemini model name                                      |
-| `OPENAI_API_KEY` | Required when using OpenAI                             |
-| `OPENAI_MODEL`   | OpenAI model name                                      |
-| `MCP_SERVER_URL` | Importer MCP URL, normally `http://127.0.0.1:4020/mcp` |
-| `MCP_API_KEY`    | Must exactly match the Importer MCP value              |
+| Variable                  | Description                                            |
+| ------------------------- | ------------------------------------------------------ |
+| `AI_PROVIDER`             | `gemini` or `openai`                                   |
+| `GEMINI_API_KEY`          | Required when using Gemini                             |
+| `GEMINI_MODEL`            | Gemini model name                                      |
+| `OPENAI_API_KEY`          | Required when using OpenAI                             |
+| `OPENAI_MODEL`            | OpenAI model name                                      |
+| `MCP_SERVER_URL`          | Importer MCP URL, normally `http://127.0.0.1:4020/mcp` |
+| `MCP_API_KEY`             | Must exactly match the Importer MCP value              |
 | `VLEI_VERIFY_MCP_COMMAND` | Optional verifier command; defaults to `pnpm`          |
-| `VLEI_VERIFY_MCP_ARGS`    | Optional JSON array of command arguments                |
-| `VLEI_VERIFY_MCP_CWD`     | Optional cwd; defaults to the workspace root            |
+| `VLEI_VERIFY_MCP_ARGS`    | Optional JSON array of command arguments               |
+| `VLEI_VERIFY_MCP_CWD`     | Optional cwd; defaults to the workspace root           |
 
 Restart the Next.js development server after changing `.env.local`.
 
