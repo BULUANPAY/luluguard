@@ -108,6 +108,40 @@ test("approved declaration uses the quote and paid fetch", async () => {
   assert.equal(result.quote.quoteId, quoteId);
 });
 
+test("serializes concurrent submissions so a quote is paid only once", async () => {
+  let paidCalls = 0;
+  let notifyPaymentStarted: () => void = () => {};
+  let releasePayment: () => void = () => {};
+  const paymentStarted = new Promise<void>((resolve) => {
+    notifyPaymentStarted = resolve;
+  });
+  const paymentReleased = new Promise<void>((resolve) => {
+    releasePayment = resolve;
+  });
+  const paidFetch: typeof globalThis.fetch = async () => {
+    paidCalls += 1;
+    notifyPaymentStarted();
+    await paymentReleased;
+    return fakePaidFetch()("http://broker.test");
+  };
+  const agent = createAgent(undefined, paidFetch);
+  await precheckAndQuote(agent, "TEST-CONCURRENT");
+
+  const first = agent.submit("TEST-CONCURRENT", quoteId, true);
+  await paymentStarted;
+  const second = agent.submit("TEST-CONCURRENT", quoteId, true);
+  releasePayment();
+
+  const results = await Promise.allSettled([first, second]);
+  assert.equal(paidCalls, 1);
+  assert.equal(results[0]?.status, "fulfilled");
+  assert.equal(results[1]?.status, "rejected");
+  assert.match(
+    String((results[1] as PromiseRejectedResult).reason),
+    /matching reviewed broker quote/i,
+  );
+});
+
 test("payment policy blocks unapproved submission", async () => {
   const agent = createAgent();
   await precheckAndQuote(agent, "TEST-002");

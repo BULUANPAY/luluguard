@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { ImporterAgent } from "./importer-agent.js";
+import { ImporterAgent, PaymentCoordinator } from "./importer-agent.js";
 import { log } from "./logger.js";
 import { config } from "./config.js";
 import { createX402PaidFetch } from "./payment/client.js";
@@ -22,6 +22,7 @@ const uploadedFilesRoot = path.resolve(process.cwd(), "../..", "uploaded-files")
 const preflightStore = new Map();
 const quoteStore = new Map();
 const paymentHistory: PaymentRecord[] = [];
+const paymentCoordinator = new PaymentCoordinator();
 const policyStore = new PolicyStore({
   maxPaymentUsd: config.payment.maxUsdc,
   allowedPayees: [config.customsBroker.address],
@@ -53,6 +54,7 @@ function createServer(traceId = newAuditId("TRACE")) {
       preflightStore,
       quoteStore,
       paymentHistory,
+      paymentCoordinator,
       traceId,
       identity,
     );

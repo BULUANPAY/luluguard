@@ -59,6 +59,26 @@ export interface SubmissionResult extends QuoteResult {
   settlement?: unknown;
 }
 
+export class PaymentCoordinator {
+  private tail: Promise<void> = Promise.resolve();
+
+  async runExclusive<T>(operation: () => Promise<T>): Promise<T> {
+    let release: () => void = () => undefined;
+    const turn = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const previous = this.tail;
+    this.tail = turn;
+
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  }
+}
+
 export class ImporterAgent {
   constructor(
     private readonly customsBrokerApiUrl: string,
@@ -71,6 +91,7 @@ export class ImporterAgent {
     private readonly preflightStore = new Map<string, PreflightResult>(),
     private readonly quoteStore = new Map<string, QuoteResult>(),
     private readonly paymentHistory: PaymentRecord[] = [],
+    private readonly paymentCoordinator = new PaymentCoordinator(),
     private readonly traceId = newAuditId("TRACE"),
     private readonly identity?: VerifiedAgentAuthorization,
   ) {}
@@ -292,6 +313,16 @@ export class ImporterAgent {
     orderId: string,
     quoteId: string,
     humanApproved = false,
+  ): Promise<SubmissionResult> {
+    return this.paymentCoordinator.runExclusive(() =>
+      this.submitExclusive(orderId, quoteId, humanApproved),
+    );
+  }
+
+  private async submitExclusive(
+    orderId: string,
+    quoteId: string,
+    humanApproved: boolean,
   ): Promise<SubmissionResult> {
     const audit: string[] = [];
     const paymentAttemptId = `ATTEMPT-${randomUUID()}`;
