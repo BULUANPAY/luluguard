@@ -63,10 +63,10 @@ export interface ExportObjectPayload {
 }
 
 const goodsCatalog = [
-  { description: "Industrial stainless steel fasteners", hsCode: "731815" },
-  { description: "Recycled polyester textile rolls", hsCode: "540761" },
-  { description: "Precision bicycle components", hsCode: "871499" },
-  { description: "Roasted oolong tea gift boxes", hsCode: "090240" },
+  { description: "Scottish White Unicorn", hsCode: "010121" },
+  { description: "Highland Silver-Mane Unicorn", hsCode: "010121" },
+  { description: "Golden Foal Unicorn", hsCode: "010121" },
+  { description: "Moonlit Forest Unicorn", hsCode: "010121" },
 ] as const;
 
 export function createRandomExportGoodsItem(
@@ -77,9 +77,9 @@ export function createRandomExportGoodsItem(
   return {
     description: goodsItem.description,
     hsCode: goodsItem.hsCode,
-    packageCount: randomInteger(4, 80, random),
-    grossWeightKg: randomInteger(120, 4_500, random),
-    dangerousGoods: random() > 0.9,
+    packageCount: randomInteger(1, 5, random),
+    grossWeightKg: randomInteger(380, 2_300, random),
+    dangerousGoods: false,
   };
 }
 
@@ -89,10 +89,10 @@ export function createRandomExportObject(
   random: () => number = Math.random,
 ): ExportObjectFormValues {
   const destinations = [
-    { consignee: "Northwind Retail GmbH", country: "DE", port: "Hamburg, DE" },
-    { consignee: "Pacific Horizon LLC", country: "US", port: "Los Angeles, US" },
-    { consignee: "Sakura Distribution K.K.", country: "JP", port: "Yokohama, JP" },
-    { consignee: "Meridian Trading Pte. Ltd.", country: "SG", port: "Singapore, SG" },
+    { consignee: "Taiwan Magical Creature Sanctuary", country: "TW", port: "Kaohsiung, TW" },
+    { consignee: "Mahoutokoro Unicorn Preserve", country: "JP", port: "Yokohama, JP" },
+    { consignee: "Black Forest Magical Menagerie", country: "DE", port: "Hamburg, DE" },
+    { consignee: "New Salem Unicorn Reserve", country: "US", port: "New York, US" },
   ] as const;
   const destination = pick(destinations, random);
   const departureDate = new Date(now);
@@ -107,8 +107,8 @@ export function createRandomExportObject(
     invoiceNo: `INV-${now.getFullYear()}-${randomInteger(10000, 99999, random)}`,
     incoterm: pick(["FOB", "CIF", "CPT", "DAP"] as const, random),
     currency: pick(["USD", "JPY", "EUR"] as const, random),
-    totalValue: randomInteger(8_000, 85_000, random),
-    originCountry: "TW",
+    totalValue: randomInteger(25_000, 300_000, random),
+    originCountry: "GB",
     destinationPort: destination.port,
     transportMode: pick(["sea", "air"] as const, random),
     plannedDepartureDate: formatDate(departureDate),
