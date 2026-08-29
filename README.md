@@ -81,6 +81,7 @@ Configure `apps/importer-mcp/.env`:
 | MCP server      | `MCP_HOST`, `MCP_PORT`, `MCP_API_KEY`                                                              |
 | Policy admin    | `POLICY_ADMIN_API_KEY`                                                                             |
 | Logging         | `LOG_LEVEL`                                                                                        |
+| Audit log       | `AUDIT_LOG_ENABLED`, optional `AUDIT_LOG_PATH`, `AUDIT_LOG_MAX_VALUE_LENGTH`                       |
 
 Use `SIGNER_PROVIDER=private-key` for a local private key. To use AWS KMS, set `SIGNER_PROVIDER=aws-kms` and configure the AWS variables.
 
@@ -167,6 +168,21 @@ The Web proxy forwards requests to:
 - `PUT /admin/policy`
 
 Policy state, preflights, quotes, and payment history are currently stored in memory and reset when the Importer MCP process restarts.
+
+## Audit log
+
+The Web Agent and Importer MCP write append-only JSON Lines audit logs by default:
+
+- `apps/web/logs/audit.jsonl`: chat requests, model requests and responses, model tool decisions, and MCP client interactions.
+- `apps/importer-mcp/logs/audit.jsonl`: MCP HTTP requests, tool execution, importer workflow decisions, policy checks, and broker/x402 interactions.
+
+The Web passes a `traceId` to the MCP server in `x-audit-trace-id`, so events from both files can be correlated. Every entry contains `previousHash` and `hash`; verify both hash chains with:
+
+```sh
+pnpm audit:verify
+```
+
+Authorization values, API keys, private keys, secrets, passwords, cookies, and tokens are redacted. Long values are truncated according to `AUDIT_LOG_MAX_VALUE_LENGTH`. Audit files are ignored by Git and should be shipped to durable, access-controlled storage in production.
 
 ## Validation commands
 

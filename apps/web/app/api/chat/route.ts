@@ -1,5 +1,6 @@
 import { generateAiAnswer, type ChatMessage } from "../../../lib/ai";
 import { mcpResultText, withMcpClient, withVleiVerifyMcpClient } from "../../../lib/mcp";
+import { newAuditId, writeAudit } from "../../../lib/audit";
 
 export const runtime = "nodejs";
 const instructions = `你是進口商 AI 助理。使用者詢問已上傳的訂單文件或需要文件內容判斷時，使用 get_order_files；不得假設未出現在工具結果中的文件或欄位。
@@ -43,6 +44,10 @@ function parseUploadedFiles(output: string): UploadedFile[] {
 }
 
 export async function POST(request: Request) {
+  const traceId =
+    request.headers.get("x-audit-trace-id") ?? newAuditId("TRACE");
+  const requestId = newAuditId("REQUEST");
+  const startedAt = Date.now();
   try {
     const body = (await request.json()) as {
       message?: string;
@@ -53,33 +58,93 @@ export async function POST(request: Request) {
       preflightId?: string;
       quoteId?: string;
     };
-    const selectedDocuments = (body.selectedDocuments ?? []).filter(document =>
-      ["commercial_invoice", "packing_list", "bill_of_lading", "certificate_of_origin", "product_specification", "import_permit"].includes(document)
+    writeAudit({
+      traceId,
+      spanId: requestId,
+      component: "chat-api",
+      action: "request.receive",
+      status: "attempted",
+      actor: request.headers.get("x-user-id") ?? "anonymous-user",
+      data: { method: request.method, url: request.url, body },
+    });
+    const selectedDocuments = (body.selectedDocuments ?? []).filter(
+      (document) =>
+        [
+          "commercial_invoice",
+          "packing_list",
+          "bill_of_lading",
+          "certificate_of_origin",
+          "product_specification",
+          "import_permit",
+        ].includes(document),
     );
-    const incoming = body.messages ?? (body.message ? [{ role: "user" as const, content: body.message }] : []);
+    const incoming =
+      body.messages ??
+      (body.message ? [{ role: "user" as const, content: body.message }] : []);
     const messages = incoming
       .filter((item): item is ChatMessage =>
-        Boolean(item && (item.role === "user" || item.role === "assistant") && item.content?.trim())
+        Boolean(
+          item &&
+          (item.role === "user" || item.role === "assistant") &&
+          item.content?.trim(),
+        ),
       )
       .slice(-20);
     const latest = messages.at(-1);
     if (!latest || latest.role !== "user") {
-      return Response.json({ error: "最後一則訊息必須是使用者訊息" }, { status: 400 });
+      writeAudit({
+        traceId,
+        spanId: requestId,
+        component: "chat-api",
+        action: "request.validate",
+        status: "blocked",
+        actor: "system",
+        data: { reason: "LAST_MESSAGE_NOT_USER" },
+      });
+      return Response.json(
+        { error: "最後一則訊息必須是使用者訊息" },
+        { status: 400 },
+      );
     }
-    const paymentApproved = /(同意|核准|確認).{0,12}(付款|支付)|(付款|支付).{0,12}(同意|核准|確認)|approve.{0,12}pay/i.test(latest.content);
+    const paymentApproved =
+      /(同意|核准|確認).{0,12}(付款|支付)|(付款|支付).{0,12}(同意|核准|確認)|approve.{0,12}pay/i.test(
+        latest.content,
+      );
     const workflowAction = body.workflowAction ?? "chat";
-    const workflow: { preflightId?: string; readyForBroker?: boolean; quoteId?: string } = {};
-    const answer = await withMcpClient(async (mcp) => withVleiVerifyMcpClient(async (vleiMcp) => {
+    const workflow: {
+      preflightId?: string;
+      readyForBroker?: boolean;
+      quoteId?: string;
+    } = {};
+    const answer = await withMcpClient(traceId, async (mcp) => withVleiVerifyMcpClient(async (vleiMcp) => {
+      writeAudit({
+        traceId,
+        component: "mcp-client",
+        action: "tools.list",
+        status: "attempted",
+        actor: "ai-agent",
+      });
       const [listed, vleiListed] = await Promise.all([mcp.listTools(), vleiMcp.listTools()]);
       const hasVleiVerifier = vleiListed.tools.some(tool => tool.name === "verify_vlei_json");
       const fileTools = ["get_order_files"];
-      const allowedTools = workflowAction === "precheck"
-        ? [...fileTools, "review_import_documents"]
-        : workflowAction === "broker_quote"
-          ? [...fileTools, "get_import_quote"]
-          : [...fileTools, "submit_import_declaration"];
+      writeAudit({
+        traceId,
+        component: "mcp-client",
+        action: "tools.list",
+        status: "succeeded",
+        actor: "mcp-server",
+        data: { tools: listed.tools },
+      });
+      const allowedTools =
+        workflowAction === "precheck"
+          ? [...fileTools, "review_import_documents"]
+          : workflowAction === "broker_quote"
+            ? [...fileTools, "get_import_quote"]
+            : [...fileTools, "submit_import_declaration"];
       const availableTools = [
-        ...listed.tools.filter(tool => allowedTools.includes(tool.name)),
+        ...listed.tools
+        .filter((tool) => allowedTools.includes(tool.name))
+        ,
         {
           name: "verify_uploaded_vlei_documents",
           description: "驗證目前訂單所有符合 VLEIJSON-1.0 signed envelope 格式的已上傳 JSON 文件。文件類型不限，且原始 signed envelope 不會經過模型重建。",
@@ -87,11 +152,12 @@ export async function POST(request: Request) {
         }
       ];
       const tools = availableTools.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema as Record<string, unknown>
-      }));
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema as Record<string, unknown>,
+        }));
       return generateAiAnswer({
+        traceId,
         messages,
         instructions: `${instructions}\n本次動作：${workflowAction}。前端訂單編號：${body.orderId ?? "未提供"}。前端目前勾選的文件：${selectedDocuments.join(", ") || "無"}。preflightId：${body.preflightId ?? "無"}。quoteId：${body.quoteId ?? "無"}。${workflowAction === "payment" ? "使用者已按下付款核准按鈕，你必須呼叫 submit_import_declaration。" : ""}`,
         tools,
@@ -130,12 +196,52 @@ export async function POST(request: Request) {
           if (name === "submit_import_declaration") {
             args.orderId = body.orderId;
             args.quoteId = body.quoteId;
-            args.humanApproved = workflowAction === "payment" || paymentApproved;
+            args.humanApproved =
+              workflowAction === "payment" || paymentApproved;
           }
           const targetMcp = name === "verify_vlei_json" ? vleiMcp : mcp;
-          const output = mcpResultText(await targetMcp.callTool({ name, arguments: args }));
+          const toolCallId = newAuditId("MCP-CALL");
+          writeAudit({
+            traceId,
+            spanId: toolCallId,
+            component: "mcp-client",
+            action: "tool.call",
+            status: "attempted",
+            actor: "ai-agent",
+            data: { name, arguments: args },
+          });
+          let output: string;
           try {
-            const result = JSON.parse(output) as { preflightId?: string; readyForBroker?: boolean; quote?: { quoteId?: string } };
+            output = mcpResultText(
+              await targetMcp.callTool({ name, arguments: args }),
+            );
+            writeAudit({
+              traceId,
+              spanId: toolCallId,
+              component: "mcp-client",
+              action: "tool.call",
+              status: "succeeded",
+              actor: "mcp-server",
+              data: { name, arguments: args, output },
+            });
+          } catch (error) {
+            writeAudit({
+              traceId,
+              spanId: toolCallId,
+              component: "mcp-client",
+              action: "tool.call",
+              status: "failed",
+              actor: "mcp-server",
+              data: { name, arguments: args, error },
+            });
+            throw error;
+          }
+          try {
+            const result = JSON.parse(output) as {
+              preflightId?: string;
+              readyForBroker?: boolean;
+              quote?: { quoteId?: string };
+            };
             workflow.preflightId = result.preflightId;
             workflow.readyForBroker = result.readyForBroker;
             workflow.quoteId = result.quote?.quoteId;
@@ -143,12 +249,36 @@ export async function POST(request: Request) {
             return output;
           }
           return output;
-        }
+        },
       });
     }));
-    return Response.json({ answer, workflow });
+    writeAudit({
+      traceId,
+      spanId: requestId,
+      component: "chat-api",
+      action: "request.complete",
+      status: "succeeded",
+      actor: "system",
+      data: { durationMs: Date.now() - startedAt, answer, workflow },
+    });
+    return Response.json({ answer, workflow, traceId });
   } catch (error) {
-    console.error("chat.failed", error instanceof Error ? error.message : error);
-    return Response.json({ error: error instanceof Error ? error.message : "處理失敗" }, { status: 500 });
+    console.error(
+      "chat.failed",
+      error instanceof Error ? error.message : error,
+    );
+    writeAudit({
+      traceId,
+      spanId: requestId,
+      component: "chat-api",
+      action: "request.complete",
+      status: "failed",
+      actor: "system",
+      data: { durationMs: Date.now() - startedAt, error },
+    });
+    return Response.json(
+      { error: error instanceof Error ? error.message : "處理失敗", traceId },
+      { status: 500 },
+    );
   }
 }

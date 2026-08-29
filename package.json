@@ -10,6 +10,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
+    "audit:verify": "node scripts/verify-audit-log.mjs",
     "generate:api": "pnpm --filter @luluguard/api-client generate"
   },
   "devDependencies": {
