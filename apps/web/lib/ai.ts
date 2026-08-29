@@ -19,7 +19,7 @@ interface GenerateAnswerOptions {
   callTool: (name: string, args: Record<string, unknown>) => Promise<string>;
 }
 
-const maxToolRounds = 5;
+const maxToolRounds = 30;
 
 export async function generateAiAnswer(options: GenerateAnswerOptions): Promise<string> {
   const provider = (process.env.AI_PROVIDER ?? "openai").toLowerCase();
