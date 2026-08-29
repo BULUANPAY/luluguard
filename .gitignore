@@ -34,6 +34,10 @@ dist-test
 /.vlei-json-signing/
 __pycache__/
 
+# Runtime file uploads
+/uploaded-files/**
+!/uploaded-files/.gitkeep
+
 
 # Debug
 npm-debug.log*

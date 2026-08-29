@@ -1,4 +1,5 @@
 import express from "express";
+import path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -9,6 +10,7 @@ import { config } from "./config.js";
 import { createX402PaidFetch } from "./payment/client.js";
 import type { PaymentRecord } from "./payment/policy.js";
 import { PolicyStore, type PolicyUpdate } from "./policy/policy-store.js";
+import { getOrderFiles } from "./order-files.js";
 
 const preflightStore = new Map();
 const quoteStore = new Map();
@@ -40,6 +42,32 @@ function createServer() {
       paymentHistory
     );
   };
+
+  server.registerTool(
+    "get_order_files",
+    {
+      description: "讀取指定訂單在 uploaded-files 內的 JSON 文件。可取得預設與自訂文件類型；此工具唯讀，不會聯絡報關行或付款。",
+      inputSchema: {
+        orderId: z.string().min(1).describe("要讀取文件的訂單編號"),
+        documentTypes: z.array(z.string().min(1)).optional().describe("選填；只回傳指定文件類型，省略時回傳訂單的全部文件")
+      }
+    },
+    async ({ orderId, documentTypes }) => {
+      log("info", "mcp-server", "tool.called", { tool: "get_order_files", orderId, documentTypes });
+      try {
+        policyStore.assertAgentEnabled();
+        const storageRoot = path.resolve(process.cwd(), "../..", "uploaded-files");
+        const files = await getOrderFiles(storageRoot, orderId, documentTypes);
+        const result = { orderId, fileCount: files.length, files };
+        log("info", "mcp-server", "tool.completed", { tool: "get_order_files", orderId, fileCount: files.length });
+        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log("error", "mcp-server", "tool.failed", { tool: "get_order_files", orderId, message });
+        return { isError: true, content: [{ type: "text" as const, text: message }] };
+      }
+    }
+  );
 
   server.registerTool(
     "review_import_documents",

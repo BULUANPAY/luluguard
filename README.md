@@ -130,18 +130,21 @@ Expected response:
 
 ## Import workflow
 
-The agent exposes three MCP tools in a fixed progression:
+The agent exposes four MCP tools. The read-only file tool is available throughout the workflow, while the remaining tools follow a fixed progression:
 
-1. `review_import_documents`
+1. `get_order_files`
+   - Reads uploaded JSON files for an order from `uploaded-files/<order-id>/<document-type>/`.
+   - Supports both built-in and custom document types without contacting the broker or making a payment.
+2. `review_import_documents`
    - Reviews the mock documents selected in the Web UI.
    - Produces an independent importer estimate and a `preflightId`.
    - Does not contact the customs broker and does not pay.
-2. `get_import_quote`
+3. `get_import_quote`
    - Requires a successful preflight and explicit estimate confirmation.
    - Transmits the reviewed documents to the customs broker.
    - Compares the broker quote with the independent estimate and compliance checks.
    - Returns a `quoteId` without paying.
-3. `submit_import_declaration`
+4. `submit_import_declaration`
    - Requires a matching reviewed quote that has not expired.
    - Rechecks compliance findings and runtime payment policy.
    - Requires human approval above the configured threshold.
