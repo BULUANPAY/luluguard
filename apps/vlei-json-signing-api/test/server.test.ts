@@ -3,6 +3,10 @@ import { Readable } from "node:stream";
 import { test } from "node:test";
 import type { IncomingMessage } from "node:http";
 import {
+  DEFAULT_SIGNING_API_PORT,
+  parseSigningApiPort,
+} from "../src/config.js";
+import {
   DEFAULT_ALLOWED_ORIGIN,
   MAX_REQUEST_BODY_BYTES,
   RequestBodyTooLargeError,
@@ -63,4 +67,11 @@ test("restricts browser access to the portal origin by default", () => {
       delete process.env.VLEI_SIGNING_ALLOWED_ORIGIN;
     else process.env.VLEI_SIGNING_ALLOWED_ORIGIN = previousOrigin;
   }
+});
+
+test("validates the signing API port", () => {
+  assert.equal(parseSigningApiPort(undefined), DEFAULT_SIGNING_API_PORT);
+  assert.equal(parseSigningApiPort("4021"), 4021);
+  assert.throws(() => parseSigningApiPort("1.5"), /must be an integer/);
+  assert.throws(() => parseSigningApiPort("65536"), /between 1 and 65535/);
 });
