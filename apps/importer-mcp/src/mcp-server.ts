@@ -9,7 +9,7 @@ import { log } from "./logger.js";
 import { config } from "./config.js";
 import { createX402PaidFetch } from "./payment/client.js";
 import type { PaymentRecord } from "./payment/policy.js";
-import { PolicyStore, type PolicyUpdate } from "./policy/policy-store.js";
+import { PolicyStore } from "./policy/policy-store.js";
 import { clearAuditTraceContext, newAuditId, writeAudit } from "./audit.js";
 import {
   verifyAgentAuthorization,
@@ -489,7 +489,7 @@ app.put("/admin/policy", (req, res) => {
     return;
   }
   try {
-    const changed = policyStore.update(req.body as PolicyUpdate);
+    const changed = policyStore.update(req.body);
     log("warn", "policy-admin", "policy.updated", {
       actor: req.header("x-policy-actor") ?? "unknown",
       previous: changed.previous,

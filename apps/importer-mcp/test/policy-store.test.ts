@@ -41,3 +41,33 @@ test("preserves the initial policy status", () => {
   assert.equal(store.get().status, "DISABLED");
   assert.throws(() => store.assertAgentEnabled(), /disabled by administrator/);
 });
+
+test("rejects invalid initial limits before policy enforcement starts", () => {
+  assert.throws(
+    () =>
+      new PolicyStore({
+        maxPaymentUsd: Number.NaN,
+        requireHumanApprovalAboveUsd: 0,
+        allowedPayees: [address],
+      }),
+    /Invalid initial policy.*maxPaymentUsd/,
+  );
+});
+
+test("rejects invalid statuses and unknown policy update fields", () => {
+  const store = new PolicyStore({
+    maxPaymentUsd: 1,
+    requireHumanApprovalAboveUsd: 0,
+    allowedPayees: [address],
+  });
+
+  assert.throws(
+    () => store.update({ status: "UNKNOWN" }),
+    /Invalid policy update.*status/,
+  );
+  assert.throws(
+    () => store.update({ maxPaymentUsd: 0.5, unexpected: true }),
+    /Invalid policy update.*Unrecognized key/,
+  );
+  assert.equal(store.get().version, 1);
+});
