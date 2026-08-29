@@ -1,15 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createRandomExportDocument } from "./export-document";
+import { createTestExportDocument } from "./export-document";
 import { DEMO_SIGNING_LEI, signExportDocument } from "./signing-client";
 
 describe("vLEI signing client", () => {
   it("wraps the export document in the signing API request", async () => {
-    const document = createRandomExportDocument(
+    const document = createTestExportDocument(
       "COMMERCIAL_INVOICE",
       "Sinclair Livestock Exports Ltd.",
-      new Date(2026, 7, 29),
-      () => 0.2,
     );
     let capturedInit: RequestInit | undefined;
     const fetcher = vi.fn(
@@ -52,8 +50,6 @@ describe("vLEI signing client", () => {
     expect(body.signerInfo.authorizedSignatory).toBe(
       document.issuer.authorized_signatory,
     );
-    expect(body.signerInfo.documentSource).toBe(
-      "LuLuGuard exporter workspace",
-    );
+    expect(body.signerInfo.documentSource).toBe("LuLuGuard exporter workspace");
   });
 });

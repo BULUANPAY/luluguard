@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createRandomExportDocument } from "./export-document";
+import { createTestExportDocument } from "./export-document";
 import { buildSignedResponseFileName } from "./response-download";
 import type { SignedExportDocumentEnvelope } from "./signing-client";
 
@@ -9,11 +9,9 @@ describe("signed response download", () => {
     ["COMMERCIAL_INVOICE", "I-V"],
     ["PACKING_LIST", "P-L"],
   ] as const)("builds a safe %s response file name", (documentType, label) => {
-    const payload = createRandomExportDocument(
+    const payload = createTestExportDocument(
       documentType,
       '森沐/實業:台灣* "Demo"',
-      new Date(2026, 7, 29),
-      () => 0.2,
     );
     const envelope: SignedExportDocumentEnvelope = {
       v: "VLEIJSON-1.0",

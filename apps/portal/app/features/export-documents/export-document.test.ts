@@ -1,36 +1,35 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createRandomExportDocument,
+  createEmptyExportDocument,
+  createTestExportDocument,
   parseExportDocument,
 } from "./export-document";
 
 describe("export document helpers", () => {
-  it("creates a commercial invoice with internally consistent totals", () => {
-    const document = createRandomExportDocument(
+  it("creates an empty commercial invoice without generated values", () => {
+    const document = createEmptyExportDocument(
       "COMMERCIAL_INVOICE",
       "Sinclair Livestock Exports Ltd.",
-      new Date(2026, 7, 29, 10, 30),
-      () => 0.25,
     );
 
     expect(document.document_type).toBe("COMMERCIAL_INVOICE");
     if (document.document_type !== "COMMERCIAL_INVOICE")
       throw new Error("unexpected type");
     expect(document.exporter.name).toBe("Sinclair Livestock Exports Ltd.");
-    expect(document.issuer.organization).toBe("Sinclair Livestock Exports Ltd.");
-    expect(document.items[0]?.amount).toBe(
-      document.items[0]!.quantity * document.items[0]!.unit_price,
+    expect(document.issuer.organization).toBe(
+      "Sinclair Livestock Exports Ltd.",
     );
-    expect(document.totals.total_amount).toBe(document.items[0]?.amount);
+    expect(document.document_id).toBe("");
+    expect(document.issue_date).toBe("");
+    expect(document.items[0]?.description).toBe("");
+    expect(document.totals.total_amount).toBe(0);
   });
 
-  it("creates a packing list whose quantities and weights are consistent", () => {
-    const document = createRandomExportDocument(
+  it("loads one fixed packing-list test data set", () => {
+    const document = createTestExportDocument(
       "PACKING_LIST",
       "Sinclair Livestock Exports Ltd.",
-      new Date(2026, 7, 29, 10, 30),
-      () => 0.5,
     );
 
     expect(document.document_type).toBe("PACKING_LIST");
@@ -44,7 +43,10 @@ describe("export document helpers", () => {
   });
 
   it("rejects JSON whose type does not match the selected generator", () => {
-    const document = createRandomExportDocument("PACKING_LIST", "Sinclair Livestock Exports Ltd.");
+    const document = createTestExportDocument(
+      "PACKING_LIST",
+      "Sinclair Livestock Exports Ltd.",
+    );
 
     expect(() =>
       parseExportDocument(JSON.stringify(document), "COMMERCIAL_INVOICE"),

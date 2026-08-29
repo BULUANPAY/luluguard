@@ -1,52 +1,114 @@
 import { Button } from "@luluguard/ui/components/button";
-import { Braces, RefreshCw, Send } from "lucide-react";
+import { Input } from "@luluguard/ui/components/input";
+import { Database, Send } from "lucide-react";
+import type { ReactNode } from "react";
 
-import type { ExportDocumentType } from "./export-document";
+import type {
+  ExportDocument,
+  IssuerDetails,
+  Party,
+  ShipmentDetails,
+} from "./export-document";
+
+type UpdateDocument = (mutate: (draft: ExportDocument) => void) => void;
 
 export function ExportDocumentEditor({
-  documentType,
-  json,
+  document,
   error,
   isSubmitting,
   onChange,
-  onPreview,
-  onRegenerate,
   onSubmit,
+  onUseTestData,
 }: {
-  documentType: ExportDocumentType;
-  json: string;
+  document: ExportDocument;
   error?: string;
   isSubmitting: boolean;
-  onChange: (json: string) => void;
-  onPreview: () => void;
-  onRegenerate: () => void;
+  onChange: (document: ExportDocument) => void;
   onSubmit: () => void;
+  onUseTestData: () => void;
 }) {
+  const update: UpdateDocument = (mutate) => {
+    const nextDocument = structuredClone(document);
+    mutate(nextDocument);
+    onChange(nextDocument);
+  };
+
   return (
-    <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Summary
-          label="文件類型"
-          value={
-            documentType === "COMMERCIAL_INVOICE"
-              ? "I/V 商業發票"
-              : "P/L 裝箱單"
-          }
-        />
-        <Summary label="格式" value="JSON Body" />
-        <Summary label="簽章" value="vLEI JSON" />
+    <form
+      className="space-y-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 p-3">
+        <div>
+          <p className="text-sm font-bold">固定 JSON 格式</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            修改欄位時，右側 JSON 會立即同步。
+          </p>
+        </div>
+        <Button
+          disabled={isSubmitting}
+          onClick={onUseTestData}
+          type="button"
+          variant="outline"
+        >
+          <Database className="size-4" />
+          使用測試資料
+        </Button>
       </div>
 
-      <label className="block text-sm font-semibold">
-        文件 Body（可直接編輯）
-        <textarea
-          aria-label="文件 Body"
-          className="mt-2 min-h-[620px] w-full resize-y rounded-xl border border-input bg-[#fbfdfc] p-4 font-mono text-xs leading-6 outline-none transition-shadow focus:border-primary focus:ring-2 focus:ring-primary/15"
-          onChange={(event) => onChange(event.target.value)}
-          spellCheck={false}
-          value={json}
+      <Section title="文件資訊">
+        <TextField
+          label="文件編號"
+          onChange={(value) => update((draft) => (draft.document_id = value))}
+          required
+          value={document.document_id}
         />
-      </label>
+        <TextField
+          label="發行日期"
+          onChange={(value) => update((draft) => (draft.issue_date = value))}
+          type="date"
+          value={document.issue_date}
+        />
+        <FixedValue label="文件類型" value={document.document_type} />
+      </Section>
+
+      <PartySection
+        onChange={(party) => update((draft) => (draft.exporter = party))}
+        party={document.exporter}
+        title="出口商"
+      />
+      <PartySection
+        onChange={(party) => update((draft) => (draft.importer = party))}
+        party={document.importer}
+        title="進口商"
+      />
+      <ShipmentSection document={document} update={update} />
+
+      {document.document_type === "COMMERCIAL_INVOICE" ? (
+        <InvoiceFields document={document} update={update} />
+      ) : (
+        <PackingListFields document={document} update={update} />
+      )}
+
+      <IssuerSection
+        issuer={document.issuer}
+        onChange={(issuer) => update((draft) => (draft.issuer = issuer))}
+      />
+      <Section title="簽章資訊">
+        <FixedValue label="簽章類型" value={document.signature.type} />
+        <FixedValue label="簽章狀態" value={document.signature.status} />
+        <TextField
+          label="簽章時間"
+          onChange={(value) =>
+            update((draft) => (draft.signature.signed_at = value))
+          }
+          placeholder="2026-08-29T10:30:00+08:00"
+          value={document.signature.signed_at}
+        />
+      </Section>
 
       {error ? (
         <p
@@ -57,41 +119,535 @@ export function ExportDocumentEditor({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-5">
-        <Button
-          disabled={isSubmitting}
-          onClick={onRegenerate}
-          type="button"
-          variant="outline"
-        >
-          <RefreshCw className="size-4" />
-          重新隨機產生
-        </Button>
-        <Button
-          disabled={isSubmitting}
-          onClick={onPreview}
-          type="button"
-          variant="outline"
-        >
-          <Braces className="size-4" />
-          更新 JSON 預覽
-        </Button>
-        <Button disabled={isSubmitting} onClick={onSubmit} type="button">
+      <div className="flex justify-end border-t border-border pt-5">
+        <Button disabled={isSubmitting} type="submit">
           <Send className="size-4" />
           {isSubmitting ? "簽章送出中…" : "送出至 vLEI 簽章 API"}
         </Button>
       </div>
+    </form>
+  );
+}
+
+function InvoiceFields({
+  document,
+  update,
+}: {
+  document: Extract<ExportDocument, { document_type: "COMMERCIAL_INVOICE" }>;
+  update: UpdateDocument;
+}) {
+  const item = document.items[0]!;
+  return (
+    <>
+      <Section title="發票項目">
+        <SelectField
+          label="幣別"
+          onChange={(value) =>
+            updateInvoice(update, (draft) => {
+              draft.currency = value as "USD" | "GBP";
+              draft.totals.currency = value as "USD" | "GBP";
+            })
+          }
+          options={["USD", "GBP"]}
+          value={document.currency}
+        />
+        <NumberField label="項次" readOnly value={item.line_no} />
+        <TextField
+          label="品名"
+          onChange={(value) =>
+            updateInvoiceItem(update, (draft) => (draft.description = value))
+          }
+          value={item.description}
+        />
+        <TextField
+          label="學名"
+          onChange={(value) =>
+            updateInvoiceItem(
+              update,
+              (draft) => (draft.scientific_name = value),
+            )
+          }
+          value={item.scientific_name}
+        />
+        <TextField
+          label="HS Code"
+          onChange={(value) =>
+            updateInvoiceItem(update, (draft) => (draft.hs_code = value))
+          }
+          value={item.hs_code}
+        />
+        <NumberField
+          label="數量"
+          onChange={(value) =>
+            updateInvoiceItem(update, (draft) => (draft.quantity = value))
+          }
+          value={item.quantity}
+        />
+        <FixedValue label="單位" value={item.unit} />
+        <NumberField
+          label="單價"
+          onChange={(value) =>
+            updateInvoiceItem(update, (draft) => (draft.unit_price = value))
+          }
+          value={item.unit_price}
+        />
+        <NumberField
+          label="金額"
+          onChange={(value) =>
+            updateInvoiceItem(update, (draft) => (draft.amount = value))
+          }
+          value={item.amount}
+        />
+        <TextField
+          label="DPP Batch ID"
+          onChange={(value) =>
+            updateInvoiceItem(update, (draft) => (draft.dpp_batch_id = value))
+          }
+          value={item.dpp_batch_id}
+        />
+      </Section>
+      <Section title="發票總計">
+        <NumberField
+          label="總數量"
+          onChange={(value) =>
+            updateInvoice(
+              update,
+              (draft) => (draft.totals.total_quantity = value),
+            )
+          }
+          value={document.totals.total_quantity}
+        />
+        <NumberField
+          label="總金額"
+          onChange={(value) =>
+            updateInvoice(
+              update,
+              (draft) => (draft.totals.total_amount = value),
+            )
+          }
+          value={document.totals.total_amount}
+        />
+        <FixedValue label="總計幣別" value={document.totals.currency} />
+      </Section>
+    </>
+  );
+}
+
+function PackingListFields({
+  document,
+  update,
+}: {
+  document: Extract<ExportDocument, { document_type: "PACKING_LIST" }>;
+  update: UpdateDocument;
+}) {
+  const cargo = document.cargo[0]!;
+  return (
+    <>
+      <Section title="裝箱資訊">
+        <TextField
+          label="關聯發票"
+          onChange={(value) =>
+            updatePackingList(
+              update,
+              (draft) => (draft.related_invoice = value),
+            )
+          }
+          value={document.related_invoice}
+        />
+        <TextField
+          label="包裝類型"
+          onChange={(value) =>
+            updatePackingList(
+              update,
+              (draft) => (draft.packages.package_type = value),
+            )
+          }
+          value={document.packages.package_type}
+        />
+        <NumberField
+          label="總包裝數"
+          onChange={(value) =>
+            updatePackingList(
+              update,
+              (draft) => (draft.packages.total_packages = value),
+            )
+          }
+          value={document.packages.total_packages}
+        />
+        <NumberField
+          label="每包裝數量"
+          onChange={(value) =>
+            updatePackingList(
+              update,
+              (draft) => (draft.packages.heads_per_package = value),
+            )
+          }
+          value={document.packages.heads_per_package}
+        />
+        <NumberField
+          label="總數量"
+          onChange={(value) =>
+            updatePackingList(
+              update,
+              (draft) => (draft.packages.total_quantity = value),
+            )
+          }
+          value={document.packages.total_quantity}
+        />
+        <FixedValue label="單位" value={document.packages.unit} />
+      </Section>
+      <Section title="貨物內容">
+        <NumberField label="項次" readOnly value={cargo.line_no} />
+        <TextField
+          label="品名"
+          onChange={(value) =>
+            updatePackingCargo(update, (draft) => (draft.description = value))
+          }
+          value={cargo.description}
+        />
+        <TextField
+          label="學名"
+          onChange={(value) =>
+            updatePackingCargo(
+              update,
+              (draft) => (draft.scientific_name = value),
+            )
+          }
+          value={cargo.scientific_name}
+        />
+        <NumberField
+          label="數量"
+          onChange={(value) =>
+            updatePackingCargo(update, (draft) => (draft.quantity = value))
+          }
+          value={cargo.quantity}
+        />
+        <FixedValue label="單位" value={cargo.unit} />
+        <TextField
+          label="DPP Batch ID"
+          onChange={(value) =>
+            updatePackingCargo(update, (draft) => (draft.dpp_batch_id = value))
+          }
+          value={cargo.dpp_batch_id}
+        />
+      </Section>
+      <Section title="重量與嘜頭">
+        <NumberField
+          label="淨重（kg）"
+          onChange={(value) =>
+            updatePackingList(
+              update,
+              (draft) => (draft.weight.net_weight_kg = value),
+            )
+          }
+          value={document.weight.net_weight_kg}
+        />
+        <NumberField
+          label="毛重（kg）"
+          onChange={(value) =>
+            updatePackingList(
+              update,
+              (draft) => (draft.weight.gross_weight_kg = value),
+            )
+          }
+          value={document.weight.gross_weight_kg}
+        />
+        <TextField
+          label="嘜頭"
+          onChange={(value) =>
+            updatePackingList(
+              update,
+              (draft) => (draft.marks_and_numbers.mark = value),
+            )
+          }
+          value={document.marks_and_numbers.mark}
+        />
+        <TextField
+          label="編號範圍"
+          onChange={(value) =>
+            updatePackingList(
+              update,
+              (draft) => (draft.marks_and_numbers.range = value),
+            )
+          }
+          value={document.marks_and_numbers.range}
+        />
+      </Section>
+    </>
+  );
+}
+
+function PartySection({
+  onChange,
+  party,
+  title,
+}: {
+  onChange: (party: Party) => void;
+  party: Party;
+  title: string;
+}) {
+  const change = (key: keyof Party, value: string) =>
+    onChange({ ...party, [key]: value });
+  return (
+    <Section title={title}>
+      <TextField
+        label="名稱"
+        onChange={(value) => change("name", value)}
+        value={party.name}
+      />
+      <TextField
+        label="國家"
+        onChange={(value) => change("country", value)}
+        value={party.country}
+      />
+      <TextField
+        label="地區"
+        onChange={(value) => change("region", value)}
+        value={party.region ?? ""}
+      />
+      <TextField
+        label="地址"
+        onChange={(value) => change("address", value)}
+        value={party.address}
+      />
+      <TextField
+        label="vLEI"
+        onChange={(value) => change("vlei", value)}
+        value={party.vlei}
+      />
+    </Section>
+  );
+}
+
+function ShipmentSection({
+  document,
+  update,
+}: {
+  document: ExportDocument;
+  update: UpdateDocument;
+}) {
+  const change = (key: keyof ShipmentDetails, value: string) =>
+    update((draft) => {
+      draft.shipment = {
+        ...draft.shipment,
+        [key]: value,
+      } as typeof draft.shipment;
+    });
+  return (
+    <Section title="運送資訊">
+      <TextField
+        label="原產國"
+        onChange={(value) => change("country_of_origin", value)}
+        value={document.shipment.country_of_origin}
+      />
+      <TextField
+        label="原產地區"
+        onChange={(value) => change("region_of_origin", value)}
+        value={document.shipment.region_of_origin}
+      />
+      <TextField
+        label="出口國"
+        onChange={(value) => change("country_of_export", value)}
+        value={document.shipment.country_of_export}
+      />
+      <TextField
+        label="目的地"
+        onChange={(value) => change("destination", value)}
+        value={document.shipment.destination}
+      />
+      <SelectField
+        label="運送方式"
+        onChange={(value) => change("transport_mode", value)}
+        options={["SEA", "AIR"]}
+        value={document.shipment.transport_mode}
+      />
+      <TextField
+        label="船舶／航班"
+        onChange={(value) => change("vessel", value)}
+        value={document.shipment.vessel}
+      />
+      {document.document_type === "COMMERCIAL_INVOICE" ? (
+        <TextField
+          label="Incoterm"
+          onChange={(value) => change("incoterm", value)}
+          value={document.shipment.incoterm}
+        />
+      ) : null}
+    </Section>
+  );
+}
+
+function IssuerSection({
+  issuer,
+  onChange,
+}: {
+  issuer: IssuerDetails;
+  onChange: (issuer: IssuerDetails) => void;
+}) {
+  const change = (key: keyof IssuerDetails, value: string) =>
+    onChange({ ...issuer, [key]: value });
+  return (
+    <Section title="發行人">
+      <TextField
+        label="組織"
+        onChange={(value) => change("organization", value)}
+        value={issuer.organization}
+      />
+      <TextField
+        label="授權簽署人"
+        onChange={(value) => change("authorized_signatory", value)}
+        value={issuer.authorized_signatory}
+      />
+      <TextField
+        label="職稱"
+        onChange={(value) => change("role", value)}
+        value={issuer.role}
+      />
+      <TextField
+        label="Credential"
+        onChange={(value) => change("credential", value)}
+        value={issuer.credential}
+      />
+    </Section>
+  );
+}
+
+function Section({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <fieldset className="rounded-xl border border-border p-4">
+      <legend className="px-1 text-sm font-bold">{title}</legend>
+      <div className="grid gap-4 pt-1 sm:grid-cols-2">{children}</div>
+    </fieldset>
+  );
+}
+
+function TextField({
+  label,
+  onChange,
+  placeholder,
+  required,
+  type = "text",
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  type?: string;
+  value: string;
+}) {
+  return (
+    <label className="block text-sm font-semibold">
+      {label}
+      <Input
+        className="mt-1.5"
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        required={required}
+        type={type}
+        value={value}
+      />
+    </label>
+  );
+}
+
+function NumberField({
+  label,
+  onChange,
+  readOnly,
+  value,
+}: {
+  label: string;
+  onChange?: (value: number) => void;
+  readOnly?: boolean;
+  value: number;
+}) {
+  return (
+    <label className="block text-sm font-semibold">
+      {label}
+      <Input
+        className="mt-1.5"
+        min="0"
+        onChange={(event) => onChange?.(event.target.valueAsNumber || 0)}
+        readOnly={readOnly}
+        type="number"
+        value={value}
+      />
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  options: string[];
+  value: string;
+}) {
+  return (
+    <label className="block text-sm font-semibold">
+      {label}
+      <select
+        className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function FixedValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-sm font-semibold">{label}</p>
+      <p className="mt-1.5 flex h-10 items-center rounded-lg border border-border bg-muted/50 px-3 font-mono text-sm text-muted-foreground">
+        {value}
+      </p>
     </div>
   );
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-bold">{value}</p>
-    </div>
-  );
+type Invoice = Extract<ExportDocument, { document_type: "COMMERCIAL_INVOICE" }>;
+type PackingList = Extract<ExportDocument, { document_type: "PACKING_LIST" }>;
+
+function updateInvoice(
+  update: UpdateDocument,
+  mutate: (draft: Invoice) => void,
+) {
+  update((draft) => {
+    if (draft.document_type === "COMMERCIAL_INVOICE") mutate(draft);
+  });
+}
+
+function updateInvoiceItem(
+  update: UpdateDocument,
+  mutate: (item: Invoice["items"][number]) => void,
+) {
+  updateInvoice(update, (draft) => mutate(draft.items[0]!));
+}
+
+function updatePackingList(
+  update: UpdateDocument,
+  mutate: (draft: PackingList) => void,
+) {
+  update((draft) => {
+    if (draft.document_type === "PACKING_LIST") mutate(draft);
+  });
+}
+
+function updatePackingCargo(
+  update: UpdateDocument,
+  mutate: (cargo: PackingList["cargo"][number]) => void,
+) {
+  updatePackingList(update, (draft) => mutate(draft.cargo[0]!));
 }

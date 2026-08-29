@@ -1,6 +1,6 @@
 export type ExportDocumentType = "COMMERCIAL_INVOICE" | "PACKING_LIST";
 
-interface Party {
+export interface Party {
   name: string;
   country: string;
   region?: string;
@@ -8,7 +8,7 @@ interface Party {
   vlei: string;
 }
 
-interface ShipmentDetails {
+export interface ShipmentDetails {
   country_of_origin: string;
   region_of_origin: string;
   country_of_export: string;
@@ -18,20 +18,20 @@ interface ShipmentDetails {
   incoterm?: string;
 }
 
-interface IssuerDetails {
+export interface IssuerDetails {
   organization: string;
   authorized_signatory: string;
   role: string;
   credential: string;
 }
 
-interface DocumentSignature {
+export interface DocumentSignature {
   type: "DIGITAL_SIGNATURE";
   status: "SIGNED";
   signed_at: string;
 }
 
-interface DemoMetadata {
+export interface DemoMetadata {
   fictional: true;
   purpose: "Trustworthy AI Agent Hackathon Demo";
   warning: "FICTIONAL DEMO DATA — NOT A REAL TRADE DOCUMENT";
@@ -100,144 +100,77 @@ export interface PackingList extends ExportDocumentBase {
 
 export type ExportDocument = CommercialInvoice | PackingList;
 
-const exporters = [
-  {
-    country: "United Kingdom",
-    region: "Scotland",
-    address: "12 Glenmore Industrial Estate, Inverness, Scotland, United Kingdom",
-    vlei: "LEI-DEMO-SINCLAIR-LIVESTOCK-001",
-    signatory: "James Sinclair",
-    role: "Export Compliance Manager",
-    credential: "vLEI-DEMO-SIGNATORY-SLE-001",
-    vessel: "MV Caledonian Voyager",
-  },
-] as const;
+const DEMO_METADATA: DemoMetadata = {
+  fictional: true,
+  purpose: "Trustworthy AI Agent Hackathon Demo",
+  warning: "FICTIONAL DEMO DATA — NOT A REAL TRADE DOCUMENT",
+};
 
-const importers = [
-  {
-    name: "Kaohsiung Livestock Import Center",
-    country: "Taiwan",
-    address: "No. 9, Harbor Road, Kaohsiung, Taiwan",
-    vlei: "LEI-DEMO-LIVESTOCK-TW-001",
-    destination: "Port of Kaohsiung, Taiwan",
-  },
-  {
-    name: "Yokohama Equine Import Association",
-    country: "Japan",
-    address: "7 Sakura Lane, Yokohama, Japan",
-    vlei: "LEI-DEMO-EQUINE-JP-002",
-    destination: "Port of Yokohama, Japan",
-  },
-] as const;
-
-const products = [
-  {
-    description: "Highland Pony",
-    scientificName: "Equus ferus caballus",
-    hsCode: "0101.21",
-  },
-  {
-    description: "Connemara Pony",
-    scientificName: "Equus ferus caballus",
-    hsCode: "0101.21",
-  },
-  {
-    description: "Fell Pony",
-    scientificName: "Equus ferus caballus",
-    hsCode: "0101.21",
-  },
-] as const;
-
-export function createRandomExportDocument(
+export function createEmptyExportDocument(
   documentType: ExportDocumentType,
   exporterName: string,
-  now = new Date(),
-  random: () => number = Math.random,
 ): ExportDocument {
-  const exporterProfile = pick(exporters, random);
-  const importer = pick(importers, random);
-  const product = pick(products, random);
-  const quantity = randomInteger(1, 5, random);
-  const headsPerPackage = 1;
-  const totalPackages = Math.ceil(quantity / headsPerPackage);
-  const unitPrice = randomInteger(25, 60, random) * 1_000;
-  const totalAmount = quantity * unitPrice;
-  const netWeight = quantity * randomInteger(380, 460, random);
-  const grossWeight =
-    netWeight + totalPackages * randomInteger(350, 650, random);
-  const documentDate = formatDate(now);
-  const dateStamp = documentDate.replaceAll("-", "");
-  const serial = randomInteger(100, 999, random);
-  const invoiceId = `INV-UNI-${dateStamp}-${serial}`;
-  const batchId = `DPP-EQUUS-${exporterProfile.region.slice(0, 3).toUpperCase()}-${dateStamp}-${serial}`;
-  const signedAt = toSignedAt(now);
-
   const common = {
-    issue_date: documentDate,
+    document_id: "",
+    issue_date: "",
     exporter: {
       name: exporterName,
-      country: exporterProfile.country,
-      region: exporterProfile.region,
-      address: exporterProfile.address,
-      vlei: exporterProfile.vlei,
+      country: "",
+      region: "",
+      address: "",
+      vlei: "",
     },
     importer: {
-      name: importer.name,
-      country: importer.country,
-      address: importer.address,
-      vlei: importer.vlei,
+      name: "",
+      country: "",
+      address: "",
+      vlei: "",
     },
     shipment: {
-      country_of_origin: exporterProfile.country,
-      region_of_origin: exporterProfile.region,
-      country_of_export: exporterProfile.country,
-      destination: importer.destination,
+      country_of_origin: "",
+      region_of_origin: "",
+      country_of_export: "",
+      destination: "",
       transport_mode: "SEA" as const,
-      vessel: exporterProfile.vessel,
+      vessel: "",
     },
     issuer: {
       organization: exporterName,
-      authorized_signatory: exporterProfile.signatory,
-      role: exporterProfile.role,
-      credential: exporterProfile.credential,
+      authorized_signatory: "",
+      role: "",
+      credential: "",
     },
     signature: {
       type: "DIGITAL_SIGNATURE" as const,
       status: "SIGNED" as const,
-      signed_at: signedAt,
+      signed_at: "",
     },
-    demo_metadata: {
-      fictional: true as const,
-      purpose: "Trustworthy AI Agent Hackathon Demo" as const,
-      warning: "FICTIONAL DEMO DATA — NOT A REAL TRADE DOCUMENT" as const,
-    },
+    demo_metadata: DEMO_METADATA,
   };
 
   if (documentType === "COMMERCIAL_INVOICE") {
-    const currency = pick(["USD", "GBP"] as const, random);
     return {
       ...common,
       document_type: "COMMERCIAL_INVOICE",
-      document_id: invoiceId,
-      currency,
-      shipment: { ...common.shipment, incoterm: "CIF Keelung" },
+      currency: "USD",
+      shipment: { ...common.shipment, incoterm: "" },
       items: [
         {
           line_no: 1,
-          description: product.description,
-          scientific_name: product.scientificName,
-          hs_code: product.hsCode,
-          quantity,
+          description: "",
+          scientific_name: "",
+          hs_code: "",
+          quantity: 0,
           unit: "HEAD",
-          unit_price: unitPrice,
-          amount: totalAmount,
-          dpp_batch_id: batchId,
+          unit_price: 0,
+          amount: 0,
+          dpp_batch_id: "",
         },
       ],
       totals: {
-        total_quantity: quantity,
-        total_amount: totalAmount,
-        currency,
+        total_quantity: 0,
+        total_amount: 0,
+        currency: "USD",
       },
     };
   }
@@ -245,32 +178,134 @@ export function createRandomExportDocument(
   return {
     ...common,
     document_type: "PACKING_LIST",
-    document_id: `PL-UNI-${dateStamp}-${serial}`,
-    related_invoice: invoiceId,
+    related_invoice: "",
     packages: {
-      package_type: "Livestock Transport Container",
-      total_packages: totalPackages,
-      heads_per_package: headsPerPackage,
-      total_quantity: quantity,
+      package_type: "",
+      total_packages: 0,
+      heads_per_package: 0,
+      total_quantity: 0,
       unit: "HEAD",
     },
     cargo: [
       {
         line_no: 1,
-        description: product.description,
-        scientific_name: product.scientificName,
-        quantity,
+        description: "",
+        scientific_name: "",
+        quantity: 0,
         unit: "HEAD",
-        dpp_batch_id: batchId,
+        dpp_batch_id: "",
       },
     ],
     weight: {
-      net_weight_kg: netWeight,
-      gross_weight_kg: grossWeight,
+      net_weight_kg: 0,
+      gross_weight_kg: 0,
     },
     marks_and_numbers: {
-      mark: exporterName.split(" ").slice(0, 2).join(" ").toUpperCase(),
-        range: `LOT-00001 ~ LOT-${String(quantity).padStart(5, "0")}`,
+      mark: "",
+      range: "",
+    },
+  };
+}
+
+export function createTestExportDocument(
+  documentType: ExportDocumentType,
+  exporterName: string,
+): ExportDocument {
+  const common = {
+    issue_date: "2026-08-29",
+    exporter: {
+      name: exporterName,
+      country: "United Kingdom",
+      region: "Scotland",
+      address:
+        "12 Glenmore Industrial Estate, Inverness, Scotland, United Kingdom",
+      vlei: "LEI-DEMO-SINCLAIR-LIVESTOCK-001",
+    },
+    importer: {
+      name: "Kaohsiung Livestock Import Center",
+      country: "Taiwan",
+      address: "No. 9, Harbor Road, Kaohsiung, Taiwan",
+      vlei: "LEI-DEMO-LIVESTOCK-TW-001",
+    },
+    shipment: {
+      country_of_origin: "United Kingdom",
+      region_of_origin: "Scotland",
+      country_of_export: "United Kingdom",
+      destination: "Port of Kaohsiung, Taiwan",
+      transport_mode: "SEA" as const,
+      vessel: "MV Caledonian Voyager",
+    },
+    issuer: {
+      organization: exporterName,
+      authorized_signatory: "James Sinclair",
+      role: "Export Compliance Manager",
+      credential: "vLEI-DEMO-SIGNATORY-SLE-001",
+    },
+    signature: {
+      type: "DIGITAL_SIGNATURE" as const,
+      status: "SIGNED" as const,
+      signed_at: "2026-08-29T10:30:00+08:00",
+    },
+    demo_metadata: DEMO_METADATA,
+  };
+
+  if (documentType === "COMMERCIAL_INVOICE") {
+    return {
+      ...common,
+      document_type: "COMMERCIAL_INVOICE",
+      document_id: "INV-UNI-20260829-001",
+      currency: "USD",
+      shipment: { ...common.shipment, incoterm: "CIF Kaohsiung" },
+      items: [
+        {
+          line_no: 1,
+          description: "Highland Pony",
+          scientific_name: "Equus ferus caballus",
+          hs_code: "0101.21",
+          quantity: 2,
+          unit: "HEAD",
+          unit_price: 35000,
+          amount: 70000,
+          dpp_batch_id: "DPP-EQUUS-SCO-20260829-001",
+        },
+      ],
+      totals: {
+        total_quantity: 2,
+        total_amount: 70000,
+        currency: "USD",
+      },
+    };
+  }
+
+  return {
+    ...common,
+    document_type: "PACKING_LIST",
+    document_id: "PL-UNI-20260829-001",
+    related_invoice: "INV-UNI-20260829-001",
+    packages: {
+      package_type: "Livestock Transport Container",
+      total_packages: 2,
+      heads_per_package: 1,
+      total_quantity: 2,
+      unit: "HEAD",
+    },
+    cargo: [
+      {
+        line_no: 1,
+        description: "Highland Pony",
+        scientific_name: "Equus ferus caballus",
+        quantity: 2,
+        unit: "HEAD",
+        dpp_batch_id: "DPP-EQUUS-SCO-20260829-001",
+      },
+    ],
+    weight: {
+      net_weight_kg: 840,
+      gross_weight_kg: 1680,
+    },
+    marks_and_numbers: {
+      mark: "SINCLAIR LIVESTOCK",
+      range: "LOT-00001 ~ LOT-00002",
     },
   };
 }
@@ -318,30 +353,4 @@ export function parseExportDocument(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function pick<T>(items: readonly T[], random: () => number): T {
-  return items[Math.floor(random() * items.length)] ?? items[0]!;
-}
-
-function randomInteger(min: number, max: number, random: () => number) {
-  return Math.floor(random() * (max - min + 1)) + min;
-}
-
-function formatDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function toSignedAt(date: Date) {
-  const offsetMinutes = -date.getTimezoneOffset();
-  const sign = offsetMinutes >= 0 ? "+" : "-";
-  const hours = String(Math.floor(Math.abs(offsetMinutes) / 60)).padStart(
-    2,
-    "0",
-  );
-  const minutes = String(Math.abs(offsetMinutes) % 60).padStart(2, "0");
-  return `${formatDate(date)}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}${sign}${hours}:${minutes}`;
 }

@@ -10,7 +10,6 @@ import {
 import {
   ArrowLeft,
   CheckCircle2,
-  Dices,
   Download,
   FileText,
   LockKeyhole,
@@ -23,9 +22,9 @@ import { useSession } from "../features/auth/session-context";
 import { JsonPreview } from "../features/exports/json-preview";
 import { ExportDocumentEditor } from "../features/export-documents/export-document-editor";
 import {
-  createRandomExportDocument,
+  createEmptyExportDocument,
+  createTestExportDocument,
   parseExportDocument,
-  type ExportDocument,
   type ExportDocumentType,
 } from "../features/export-documents/export-document";
 import { downloadSignedResponse } from "../features/export-documents/response-download";
@@ -65,52 +64,32 @@ function ExportDocumentWorkspace({
 }) {
   const [documentType, setDocumentType] =
     useState<ExportDocumentType>("COMMERCIAL_INVOICE");
-  const [draftVersion, setDraftVersion] = useState(0);
   const [document, setDocument] = useState(() =>
-    createRandomExportDocument(documentType, exporterCompany),
+    createEmptyExportDocument(documentType, exporterCompany),
   );
-  const [json, setJson] = useState(() => JSON.stringify(document, null, 2));
-  const [preview, setPreview] = useState<ExportDocument>(document);
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [error, setError] = useState<string>();
   const [envelope, setEnvelope] = useState<SignedExportDocumentEnvelope>();
   const [isSignDialogOpen, setIsSignDialogOpen] = useState(false);
 
-  const resetWithDocument = (nextType: ExportDocumentType) => {
-    const nextDocument = createRandomExportDocument(nextType, exporterCompany);
+  const switchDocumentType = (nextType: ExportDocumentType) => {
+    const nextDocument = createEmptyExportDocument(nextType, exporterCompany);
     setDocumentType(nextType);
     setDocument(nextDocument);
-    setJson(JSON.stringify(nextDocument, null, 2));
-    setPreview(nextDocument);
-    setDraftVersion((version) => version + 1);
     setSubmitState("idle");
     setError(undefined);
     setEnvelope(undefined);
-  };
-
-  const readEditor = () => {
-    const parsed = parseExportDocument(json, documentType);
-    setDocument(parsed);
-    setPreview(parsed);
-    setError(undefined);
-    return parsed;
-  };
-
-  const updatePreview = () => {
-    try {
-      readEditor();
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "無法解析文件 Body。",
-      );
-    }
   };
 
   const submit = async (identity: SigningIdentity) => {
     setSubmitState("submitting");
     setEnvelope(undefined);
     try {
-      const currentDocument = readEditor();
+      const currentDocument = parseExportDocument(
+        JSON.stringify(document),
+        documentType,
+      );
+      setError(undefined);
       const result = await signExportDocument(currentDocument, identity);
       setEnvelope(result);
       setSubmitState("success");
@@ -142,13 +121,9 @@ function ExportDocumentWorkspace({
             產生出口文件
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            切換 I/V 或 P/L，產生要提供給進口商的示範文件，確認後由出口商送至
+            在左側填寫固定格式的 I/V 或 P/L，右側會即時產生 JSON，確認後可送至
             vLEI JSON signing API。
           </p>
-        </div>
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-white/70 px-4 py-2 text-sm text-muted-foreground shadow-sm">
-          <Dices className="size-4 text-primary" />第 {draftVersion + 1}{" "}
-          組隨機草稿
         </div>
       </section>
 
@@ -159,16 +134,16 @@ function ExportDocumentWorkspace({
         <DocumentTypeButton
           active={documentType === "COMMERCIAL_INVOICE"}
           label="I/V 商業發票"
-          onClick={() => resetWithDocument("COMMERCIAL_INVOICE")}
+          onClick={() => switchDocumentType("COMMERCIAL_INVOICE")}
         />
         <DocumentTypeButton
           active={documentType === "PACKING_LIST"}
           label="P/L 裝箱單"
-          onClick={() => resetWithDocument("PACKING_LIST")}
+          onClick={() => switchDocumentType("PACKING_LIST")}
         />
       </div>
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(420px,0.8fr)]">
+      <div className="grid items-start gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>
@@ -177,24 +152,29 @@ function ExportDocumentWorkspace({
                 : "P/L 裝箱單"}
             </CardTitle>
             <CardDescription>
-              內容可直接修改；預覽與送出前會檢查 JSON 格式及文件類型。
+              依固定欄位填寫文件內容，也可載入一組固定測試資料。
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ExportDocumentEditor
-              documentType={documentType}
+              document={document}
               error={error}
               isSubmitting={submitState === "submitting"}
-              json={json}
               onChange={(value) => {
-                setJson(value);
+                setDocument(value);
                 setSubmitState("idle");
                 setError(undefined);
                 setEnvelope(undefined);
               }}
-              onPreview={updatePreview}
-              onRegenerate={() => resetWithDocument(documentType)}
               onSubmit={() => setIsSignDialogOpen(true)}
+              onUseTestData={() => {
+                setDocument(
+                  createTestExportDocument(documentType, exporterCompany),
+                );
+                setSubmitState("idle");
+                setError(undefined);
+                setEnvelope(undefined);
+              }}
             />
 
             {isSignDialogOpen ? (
@@ -257,7 +237,7 @@ function ExportDocumentWorkspace({
             <div>
               <p className="font-display text-lg font-bold">JSON 預覽</p>
               <p className="mt-1 text-sm text-white/50">
-                送出時會將此文件包在 signing API 的 payload 欄位。
+                表單修改後自動更新；送出時會將此文件放入 signing API payload。
               </p>
             </div>
             <ShieldCheck className="mt-1 size-5 text-[#d9f99d]" />
@@ -268,7 +248,7 @@ function ExportDocumentWorkspace({
                 ? "commercial-invoice.json"
                 : "packing-list.json"
             }
-            payload={preview}
+            payload={document}
           />
         </aside>
       </div>
