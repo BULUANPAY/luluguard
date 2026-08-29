@@ -205,7 +205,7 @@ export async function POST(request: Request) {
           sessionId: session.sessionId,
         },
         messages,
-        instructions: `${instructions}\n本次動作：${workflowAction}。前端訂單編號：${body.orderId ?? "未提供"}。preflightId：${body.preflightId ?? "無"}。quoteId：${body.quoteId ?? "無"}。${workflowAction === "payment" ? "使用者已按下付款核准按鈕，你必須呼叫 submit_import_declaration。" : ""}`,
+        instructions: `${instructions}\n本次動作：${workflowAction}。前端訂單編號：${body.orderId ?? "未提供"}。文件來源僅限於該訂單在 uploaded-files 內的所有檔案。preflightId：${body.preflightId ?? "無"}。quoteId：${body.quoteId ?? "無"}。${workflowAction === "payment" ? "使用者已按下付款核准按鈕，你必須呼叫 submit_import_declaration。" : ""}`,
         tools,
         callTool: async (name, args) => {
           if (name === "verify_uploaded_vlei_documents") {
