@@ -73,6 +73,28 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  apps/vlei-json-signing-api:
+    dependencies:
+      '@repo/vlei-json-signing':
+        specifier: workspace:*
+        version: link:../../packages/vlei-json-signing
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      eslint:
+        specifier: ^10.0.0
+        version: 10.9.1
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   apps/vlei-json-signing-test:
     dependencies:
       '@repo/vlei-json-signing':

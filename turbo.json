@@ -29,7 +29,8 @@
     "X402_NETWORK",
     "LOG_LEVEL",
     "VLEI_ROOT_SEED",
-    "VLEI_STATE_DIR"
+    "VLEI_STATE_DIR",
+    "VLEI_SIGNING_API_PORT"
   ],
   "tasks": {
     "build": {
