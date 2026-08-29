@@ -241,6 +241,9 @@ importers:
       '@google/genai':
         specifier: ^2.19.0
         version: 2.19.0(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))
+      '@luluguard/vlei-json-verify-mcp':
+        specifier: workspace:*
+        version: link:../vlei-json-verify-mcp
       '@modelcontextprotocol/sdk':
         specifier: ^1.17.3
         version: 1.30.0(zod@4.4.3)

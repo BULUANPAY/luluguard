@@ -61,6 +61,9 @@ Configure `apps/web/.env.local`:
 | `OPENAI_MODEL`   | OpenAI model name                                      |
 | `MCP_SERVER_URL` | Importer MCP URL, normally `http://127.0.0.1:4020/mcp` |
 | `MCP_API_KEY`    | Must exactly match the Importer MCP value              |
+| `VLEI_VERIFY_MCP_COMMAND` | Optional verifier command; defaults to `pnpm`          |
+| `VLEI_VERIFY_MCP_ARGS`    | Optional JSON array of command arguments                |
+| `VLEI_VERIFY_MCP_CWD`     | Optional cwd; defaults to the workspace root            |
 
 Restart the Next.js development server after changing `.env.local`.
 
@@ -88,6 +91,8 @@ Start the applications:
 ```sh
 pnpm dev
 ```
+
+Turborepo 會先 build Web 所依賴的 vLEI verifier MCP 與 JSON signing package。
 
 Alternatively, run each application in a separate terminal:
 

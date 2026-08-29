@@ -1,5 +1,5 @@
 import { generateAiAnswer, type ChatMessage } from "../../../lib/ai";
-import { mcpResultText, withMcpClient } from "../../../lib/mcp";
+import { mcpResultText, withMcpClient, withVleiVerifyMcpClient } from "../../../lib/mcp";
 
 export const runtime = "nodejs";
 const instructions = `你是進口商 AI 助理。文件預檢階段只使用 review_import_documents，在進口商端檢查文件並產生獨立預估，不得聯絡報關行。
@@ -7,6 +7,7 @@ const instructions = `你是進口商 AI 助理。文件預檢階段只使用 re
 向使用者說明候選稅則、預估稅費、報關行服務費、有效期限、缺件、差異與付款 blocker。不得宣稱 AI 已完成法定稅則核定。
 只有使用者在後續訊息明確同意付款時，才可用該 quoteId 呼叫 submit_import_declaration；不可跳過報價，也不可自行將 humanApproved 設為 true。
 complianceReview.paymentAllowed 為 false 時，不得嘗試付款，必須先請使用者補正 blocker。
+使用者提供 vLEI-signed JSON 並要求驗證時，使用 verify_vlei_json。expectedRootAid 必須來自使用者或可信任的既有設定，不可把 envelope proof 內自帶的 rootAid 當成信任來源；若缺少可信任 root AID，先請使用者提供。驗證失敗時應清楚說明 errors，不可使用未驗證的 payload 做後續決策。
 請使用繁體中文簡潔回答，並清楚標示交易與申報結果。`;
 
 type WorkflowAction = "chat" | "precheck" | "broker_quote" | "payment";
@@ -38,14 +39,18 @@ export async function POST(request: Request) {
     const paymentApproved = /(同意|核准|確認).{0,12}(付款|支付)|(付款|支付).{0,12}(同意|核准|確認)|approve.{0,12}pay/i.test(latest.content);
     const workflowAction = body.workflowAction ?? "chat";
     const workflow: { preflightId?: string; readyForBroker?: boolean; quoteId?: string } = {};
-    const answer = await withMcpClient(async (mcp) => {
-      const listed = await mcp.listTools();
+    const answer = await withMcpClient(async (mcp) => withVleiVerifyMcpClient(async (vleiMcp) => {
+      const [listed, vleiListed] = await Promise.all([mcp.listTools(), vleiMcp.listTools()]);
       const allowedTools = workflowAction === "precheck"
         ? ["review_import_documents"]
         : workflowAction === "broker_quote"
           ? ["get_import_quote"]
           : ["submit_import_declaration"];
-      const tools = listed.tools.filter(tool => allowedTools.includes(tool.name)).map((tool) => ({
+      const availableTools = [
+        ...listed.tools.filter(tool => allowedTools.includes(tool.name)),
+        ...vleiListed.tools.filter(tool => tool.name === "verify_vlei_json")
+      ];
+      const tools = availableTools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema as Record<string, unknown>
@@ -68,7 +73,8 @@ export async function POST(request: Request) {
             args.quoteId = body.quoteId;
             args.humanApproved = workflowAction === "payment" || paymentApproved;
           }
-          const output = mcpResultText(await mcp.callTool({ name, arguments: args }));
+          const targetMcp = name === "verify_vlei_json" ? vleiMcp : mcp;
+          const output = mcpResultText(await targetMcp.callTool({ name, arguments: args }));
           try {
             const result = JSON.parse(output) as { preflightId?: string; readyForBroker?: boolean; quote?: { quoteId?: string } };
             workflow.preflightId = result.preflightId;
@@ -80,7 +86,7 @@ export async function POST(request: Request) {
           return output;
         }
       });
-    });
+    }));
     return Response.json({ answer, workflow });
   } catch (error) {
     console.error("chat.failed", error instanceof Error ? error.message : error);
