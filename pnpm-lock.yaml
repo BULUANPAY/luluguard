@@ -20,6 +20,9 @@ importers:
 
   apps/customs-broker:
     dependencies:
+      '@luluguard/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@x402/core':
         specifier: 2.24.0
         version: 2.24.0
@@ -151,6 +154,9 @@ importers:
       '@aws-sdk/client-kms':
         specifier: ^3.1119.0
         version: 3.1120.0
+      '@luluguard/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@modelcontextprotocol/sdk':
         specifier: ^1.17.3
         version: 1.30.0(zod@3.25.76)
@@ -287,6 +293,9 @@ importers:
       '@google/genai':
         specifier: ^2.19.0
         version: 2.19.0(@modelcontextprotocol/sdk@1.30.0(zod@3.25.76))
+      '@luluguard/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@luluguard/vlei-json-verify-mcp':
         specifier: workspace:*
         version: link:../vlei-json-verify-mcp

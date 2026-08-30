@@ -11,7 +11,7 @@ import {
   parseWorkflowRequest,
   WorkflowRequestError,
 } from "../../../lib/workflow-request";
-import documentTypes from "../../example-document-types.json";
+import { TRADE_DOCUMENT_TYPES } from "@luluguard/shared";
 import exampleOrders from "../../example-orders.json";
 
 export const runtime = "nodejs";
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
               .filter(file => isVleiEnvelopeCandidate(file.content));
             if (files.length === 0) throw new Error("找不到符合 VLEIJSON-1.0 signed envelope 格式的已上傳文件");
             const verificationResults = await Promise.all(files.map(async (file) => {
-              const documentType = documentTypes.find(candidate => candidate.type === file.documentType);
+              const documentType = TRADE_DOCUMENT_TYPES.find(candidate => candidate.type === file.documentType);
               const expectedLei = documentType?.providedByExporter ? order.exporter.lei : undefined;
               return {
                 documentType: file.documentType,

@@ -41,7 +41,7 @@ const documents: ExportDocuments = {
   billOfLadingNumber: "BL-001",
   certificateOfOriginNumber: "COO-001",
   importPermitNumber: "PERMIT-001",
-  providedDocuments: ["commercial_invoice", "packing_list"],
+  providedDocuments: ["commercial_invoice", "packing_list", "power_of_attorney"],
   items: [{
     description: "Widget",
     model: "W-1",
@@ -114,12 +114,40 @@ test("validates required document types, cross-field data, uniqueness, and stric
   const completeDocuments = {
     ...documents,
     billOfLadingNumber: "BL-CORE-001",
-    providedDocuments: ["commercial_invoice", "packing_list", "bill_of_lading"] as const
+    providedDocuments: [
+      "commercial_invoice",
+      "packing_list",
+      "bill_of_lading",
+      "power_of_attorney"
+    ] as const
   };
   assert.equal(QuoteRequestSchema.safeParse(completeDocuments).success, true);
   assert.equal(QuoteRequestSchema.safeParse({
     ...completeDocuments,
-    providedDocuments: ["commercial_invoice", "packing_list", "packing_list"]
+    providedDocuments: ["commercial_invoice", "packing_list"]
+  }).success, false);
+  assert.equal(QuoteRequestSchema.safeParse({
+    ...completeDocuments,
+    billOfLadingNumber: undefined,
+    providedDocuments: ["commercial_invoice", "packing_list", "power_of_attorney"]
+  }).success, true);
+  assert.equal(QuoteRequestSchema.safeParse({
+    ...completeDocuments,
+    providedDocuments: [
+      "commercial_invoice",
+      "packing_list",
+      "digital_product_passport",
+      "power_of_attorney"
+    ]
+  }).success, true);
+  assert.equal(QuoteRequestSchema.safeParse({
+    ...completeDocuments,
+    providedDocuments: [
+      "commercial_invoice",
+      "packing_list",
+      "packing_list",
+      "power_of_attorney"
+    ]
   }).success, false);
   assert.equal(QuoteRequestSchema.safeParse({
     ...completeDocuments,

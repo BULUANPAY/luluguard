@@ -1,3 +1,4 @@
+import { REQUIRED_TRADE_DOCUMENT_TYPES } from "@luluguard/shared";
 import type { ExportDocuments, TradeDocumentType } from "./domain.js";
 import type { ReviewFinding } from "./compliance-review.js";
 
@@ -21,12 +22,7 @@ export interface LowCarbonAssessment {
 
 export const LOW_CARBON_REDUCTION_THRESHOLD_PERCENT = 20;
 
-const requiredDocuments: TradeDocumentType[] = [
-  "commercial_invoice",
-  "packing_list",
-  "bill_of_lading",
-  "digital_product_passport",
-];
+const requiredDocuments: TradeDocumentType[] = REQUIRED_TRADE_DOCUMENT_TYPES;
 
 function isPositive(value: number | undefined): value is number {
   return value !== undefined && Number.isFinite(value) && value > 0;
@@ -104,6 +100,22 @@ export function reviewDocumentsBeforeTransmission(
       severity: "warning",
       message:
         "Origin evidence was not selected; preferential tariff eligibility cannot be assessed.",
+    });
+  }
+  if (!selected.has("bill_of_lading")) {
+    findings.push({
+      code: "BILL_OF_LADING_NOT_SELECTED",
+      severity: "warning",
+      message:
+        "Bill of lading was not selected; shipment and carrier details cannot be verified.",
+    });
+  }
+  if (!selected.has("digital_product_passport")) {
+    findings.push({
+      code: "DIGITAL_PRODUCT_PASSPORT_NOT_SELECTED",
+      severity: "warning",
+      message:
+        "Digital product passport was not selected; low-carbon qualification cannot be assessed.",
     });
   }
   if (!selected.has("product_specification")) {

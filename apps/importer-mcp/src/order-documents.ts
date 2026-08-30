@@ -1,3 +1,4 @@
+import { isTradeDocumentType } from "@luluguard/shared";
 import type {
   ExportDocuments,
   TradeDocumentType,
@@ -5,18 +6,8 @@ import type {
 } from "./domain.js";
 import { getOrderFiles, type OrderFile } from "./order-files.js";
 
-const knownDocumentTypes: readonly TradeDocumentType[] = [
-  "commercial_invoice",
-  "packing_list",
-  "bill_of_lading",
-  "certificate_of_origin",
-  "product_specification",
-  "digital_product_passport",
-  "import_permit",
-];
-
 function isKnownDocumentType(value: string): value is TradeDocumentType {
-  return (knownDocumentTypes as readonly string[]).includes(value);
+  return isTradeDocumentType(value);
 }
 
 function firstFileOfType(
