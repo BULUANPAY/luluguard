@@ -1,5 +1,10 @@
 import { generateAiAnswer } from "../../../lib/ai";
-import { mcpResultText, withMcpClient, withVleiVerifyMcpClient } from "../../../lib/mcp";
+import {
+  mcpResultIsError,
+  mcpResultText,
+  withMcpClient,
+  withVleiVerifyMcpClient,
+} from "../../../lib/mcp";
 import {
   clearAuditTraceContext,
   newAuditId,
@@ -159,10 +164,14 @@ export async function POST(request: Request) {
         if (!hasVleiVerifier) throw new Error("vLEI verifier MCP 未提供 verify_vlei_json");
         const order = exampleOrders.find(candidate => candidate.orderId === orderId);
         if (!order) throw new Error(`找不到訂單 ${orderId} 的 LEI 資訊`);
-        const fileOutput = mcpResultText(await mcp.callTool({
+        const fileResult = await mcp.callTool({
           name: "get_order_files",
           arguments: { orderId },
-        }));
+        });
+        const fileOutput = mcpResultText(fileResult);
+        if (mcpResultIsError(fileResult)) {
+          throw new Error(fileOutput || "get_order_files 執行失敗");
+        }
         const files = parseUploadedFiles(fileOutput).filter(file =>
           isVleiEnvelopeCandidate(file.content),
         );
@@ -171,10 +180,15 @@ export async function POST(request: Request) {
             throw new Error(`${file.filename} 不是有效的 vLEI envelope`);
           }
           const issuer = expectedDocumentIssuerLei(file, order);
-          const result = JSON.parse(mcpResultText(await vleiMcp.callTool({
+          const verificationResult = await vleiMcp.callTool({
             name: "verify_vlei_json",
             arguments: { envelope: file.content, expectedLei: issuer.expectedLei },
-          }))) as {
+          });
+          const verificationOutput = mcpResultText(verificationResult);
+          if (mcpResultIsError(verificationResult)) {
+            throw new Error(verificationOutput || "verify_vlei_json 執行失敗");
+          }
+          const result = JSON.parse(verificationOutput) as {
             valid?: boolean;
             errors?: Array<{ code?: string; message?: string }>;
           };
@@ -298,12 +312,7 @@ export async function POST(request: Request) {
           try {
             const result = await targetMcp.callTool({ name, arguments: args });
             output = mcpResultText(result);
-            const isError = Boolean(
-              result &&
-              typeof result === "object" &&
-              "isError" in result &&
-              result.isError,
-            );
+            const isError = mcpResultIsError(result);
             writeAudit({
               traceId,
               spanId: toolCallId,
@@ -379,16 +388,19 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const clientError = error instanceof WorkflowRequestError;
-    console.error(
-      "chat.failed",
-      error instanceof Error ? error.message : error,
-    );
+    const originalMessage = error instanceof Error ? error.message : String(error);
+    const policyBlocked = originalMessage === "AI Agent is disabled by administrator policy";
+    const responseMessage = policyBlocked
+      ? "AI Agent 已由管理員 Policy 停用，請重新啟用後再執行。"
+      : originalMessage || "處理失敗";
+    if (policyBlocked) console.warn("chat.blocked", originalMessage);
+    else console.error("chat.failed", originalMessage);
     writeAudit({
       traceId,
       spanId: requestId,
       component: "chat-api",
       action: "request.complete",
-      status: "failed",
+      status: policyBlocked ? "blocked" : "failed",
       actor: "system",
       tenantId: session?.employee.tenantId,
       userId: session?.employee.id,
@@ -399,8 +411,8 @@ export async function POST(request: Request) {
     });
     clearAuditTraceContext(traceId);
     return Response.json(
-      { error: error instanceof Error ? error.message : "處理失敗", traceId },
-      { status: clientError ? 400 : 500 },
+      { error: responseMessage, traceId },
+      { status: policyBlocked ? 423 : clientError ? 400 : 500 },
     );
   }
 }
