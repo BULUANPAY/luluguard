@@ -19,6 +19,18 @@ export interface PaymentRecord {
   receiptId: string;
 }
 
+export type PaymentReservationState = "active" | "ambiguous";
+
+export interface PaymentReservation {
+  reservationId: string;
+  timestamp: string;
+  amountUsdc: number;
+  payee: string;
+  quoteId: string;
+  state: PaymentReservationState;
+  decision: PaymentPolicyDecision;
+}
+
 export interface PaymentPolicyDecision {
   auditId: string;
   allowed: boolean;
@@ -39,6 +51,102 @@ export interface PaymentPolicyDecision {
 export class PaymentPolicyError extends Error {
   constructor(readonly decision: PaymentPolicyDecision) {
     super(`Payment blocked by policy: ${decision.reasonCodes.join(", ")}`);
+  }
+}
+
+export class PaymentReservationError extends Error {
+  readonly reasonCode = "PAYMENT_ALREADY_IN_FLIGHT" as const;
+
+  constructor(readonly quoteId: string, readonly reservation: PaymentReservation) {
+    super(`Payment blocked by policy: PAYMENT_ALREADY_IN_FLIGHT for quote ${quoteId}`);
+    this.name = "PaymentReservationError";
+  }
+}
+
+export class PaymentReservationStore {
+  private readonly reservations = new Map<string, PaymentReservation>();
+
+  reserve(
+    policy: AgentPolicy,
+    amountUsdc: number,
+    payee: string,
+    humanApproved: boolean,
+    history: PaymentRecord[],
+    quoteId: string
+  ): PaymentReservation {
+    const existingReservation = [...this.reservations.values()].find(
+      reservation => reservation.quoteId === quoteId &&
+        (reservation.state === "active" || reservation.state === "ambiguous")
+    );
+    if (existingReservation !== undefined) {
+      throw new PaymentReservationError(quoteId, existingReservation);
+    }
+    const inFlight = [...this.reservations.values()].map(reservation => ({
+      timestamp: reservation.timestamp,
+      amountUsdc: reservation.amountUsdc,
+      payee: reservation.payee,
+      quoteId: reservation.quoteId,
+      receiptId: `RESERVATION-${reservation.reservationId}`
+    }));
+    const decision = assertPaymentAllowed(
+      policy,
+      amountUsdc,
+      payee,
+      humanApproved,
+      [...history, ...inFlight]
+    );
+    const reservation: PaymentReservation = {
+      reservationId: decision.auditId,
+      timestamp: new Date().toISOString(),
+      amountUsdc,
+      payee,
+      quoteId,
+      state: "active",
+      decision
+    };
+    this.reservations.set(reservation.reservationId, reservation);
+    return reservation;
+  }
+
+  release(reservationId: string): void {
+    this.reservations.delete(reservationId);
+  }
+
+  holdAmbiguous(reservationId: string): void {
+    const reservation = this.reservations.get(reservationId);
+    if (reservation !== undefined) reservation.state = "ambiguous";
+  }
+
+  commit(reservationId: string): void {
+    this.reservations.delete(reservationId);
+  }
+
+  releaseAllForQuote(quoteId: string): void {
+    for (const [reservationId, reservation] of this.reservations) {
+      if (reservation.quoteId === quoteId) this.reservations.delete(reservationId);
+    }
+  }
+
+  listForQuote(quoteId: string): PaymentReservation[] {
+    return [...this.reservations.values()]
+      .filter(reservation => reservation.quoteId === quoteId)
+      .map(reservation => this.cloneReservation(reservation));
+  }
+
+  get(reservationId: string): PaymentReservation | undefined {
+    const reservation = this.reservations.get(reservationId);
+    return reservation === undefined ? undefined : this.cloneReservation(reservation);
+  }
+
+  private cloneReservation(reservation: PaymentReservation): PaymentReservation {
+    return {
+      ...reservation,
+      decision: {
+        ...reservation.decision,
+        reasonCodes: [...reservation.decision.reasonCodes],
+        limits: { ...reservation.decision.limits }
+      }
+    };
   }
 }
 

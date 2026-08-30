@@ -10,7 +10,7 @@ export interface ImporterSigner {
 }
 
 export function requireAddress(name: string, address: string): `0x${string}` {
-  if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address) || /^0x0{40}$/i.test(address)) {
     throw new Error(`${name} must be a valid EVM address`);
   }
   return address as `0x${string}`;

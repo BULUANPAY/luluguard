@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { evaluatePaymentPolicy, type PaymentRecord } from "../src/payment/policy.js";
+import {
+  evaluatePaymentPolicy,
+  PaymentReservationError,
+  PaymentReservationStore,
+  type PaymentRecord
+} from "../src/payment/policy.js";
+import { requireAddress } from "../src/payment/signer.js";
 
 const payee = "0x2222222222222222222222222222222222222222";
 const policy = {
@@ -42,5 +48,32 @@ test("payment pause and agent disable are enforced by the payment gate", () => {
   assert.deepEqual(
     evaluatePaymentPolicy({ ...policy, status: "DISABLED" }, 0.01, payee, true, []).reasonCodes,
     ["AGENT_DISABLED"]
+  );
+});
+
+test("zero addresses are rejected before signer setup", () => {
+  assert.throws(
+    () => requireAddress("CUSTOMS_BROKER_ADDRESS", "0x0000000000000000000000000000000000000000"),
+    /valid EVM address/
+  );
+});
+
+test("a quote cannot have more than one active or ambiguous reservation", () => {
+  const store = new PaymentReservationStore();
+  const first = store.reserve(policy, 0.01, payee, true, [], "QUOTE-RESERVATION");
+
+  assert.throws(
+    () => store.reserve(policy, 0.01, payee, true, [], "QUOTE-RESERVATION"),
+    error => {
+      assert.ok(error instanceof PaymentReservationError);
+      assert.equal(error.reasonCode, "PAYMENT_ALREADY_IN_FLIGHT");
+      return true;
+    }
+  );
+
+  store.holdAmbiguous(first.reservationId);
+  assert.throws(
+    () => store.reserve(policy, 0.01, payee, true, [], "QUOTE-RESERVATION"),
+    /PAYMENT_ALREADY_IN_FLIGHT/
   );
 });

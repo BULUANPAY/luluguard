@@ -40,7 +40,7 @@ export function estimateImportCosts(
   const estimatedTotalUsd = Number((
     estimatedDutyUsd + estimatedVatUsd + estimatedTradePromotionFeeUsd +
     estimatedFilingFeeUsd + expectedBrokerFeeUsdc
-  ).toFixed(2));
+  ).toFixed(6));
   const candidateHsCode = documents.items.length === 1 ? documents.items[0]?.hsCode ?? null : null;
   const findings: ReviewFinding[] = [{
     code: "CANDIDATE_TARIFF_ONLY",
