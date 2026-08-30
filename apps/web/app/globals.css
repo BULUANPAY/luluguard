@@ -295,6 +295,250 @@ h1 {
   background: #f1d98d;
   color: #2c250d;
 }
+.authorization-overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(1, 8, 9, 0.82);
+  backdrop-filter: blur(10px);
+}
+.authorization-dialog {
+  display: grid;
+  grid-template-rows: auto auto minmax(220px, 1fr) auto;
+  width: min(760px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+  border: 1px solid #37665f;
+  border-radius: 24px;
+  background: #081719;
+  box-shadow: 0 32px 100px #000c;
+}
+.authorization-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 28px 18px;
+}
+.authorization-header h2 {
+  margin: 5px 0 6px;
+  font-size: clamp(25px, 4vw, 34px);
+  letter-spacing: -0.025em;
+  outline: 0;
+}
+.authorization-header > div > p:last-child {
+  max-width: 570px;
+  margin: 0;
+  color: #98b5af;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.authorization-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #355357;
+  background: transparent;
+  color: #a8c0bc;
+  font-size: 24px;
+  line-height: 1;
+}
+.authorization-progress {
+  display: grid;
+  grid-template-columns: 22px minmax(40px, 1fr) 22px;
+  grid-template-rows: auto auto;
+  align-items: center;
+  max-width: 360px;
+  margin: 0 auto 18px;
+  color: #86a49e;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+.authorization-progress span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #47635f;
+  border-radius: 50%;
+}
+.authorization-progress span.done {
+  border-color: #68e0c1;
+  background: #68e0c1;
+  color: #06201a;
+}
+.authorization-progress i {
+  height: 1px;
+  background: #47635f;
+}
+.authorization-progress p {
+  margin: 7px -45px 0;
+}
+.authorization-progress p:first-of-type {
+  grid-column: 1;
+}
+.authorization-progress p:last-of-type {
+  grid-column: 3;
+}
+.authorization-document {
+  overflow-y: auto;
+  margin: 0 28px;
+  border: 1px solid #29494d;
+  border-radius: 16px;
+  background: #f4f0e7;
+  color: #172321;
+  outline: 0;
+}
+.authorization-document:focus-visible {
+  box-shadow: 0 0 0 2px #68e0c1;
+}
+.authorization-document-heading {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 16px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid #d6d0c2;
+}
+.authorization-document-heading span,
+.authorization-document-heading small {
+  color: #687570;
+  font-size: 11px;
+}
+.authorization-document-heading strong {
+  grid-column: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.authorization-document-heading small {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+.authorization-parties {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0 24px;
+  border-bottom: 1px solid #d6d0c2;
+}
+.authorization-parties > div {
+  min-width: 0;
+  padding: 18px 16px 18px 0;
+}
+.authorization-parties > div + div {
+  padding-left: 16px;
+  border-left: 1px solid #d6d0c2;
+}
+.authorization-parties dt {
+  margin-bottom: 7px;
+  color: #6a7772;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.authorization-parties dd {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.authorization-parties small {
+  display: block;
+  color: #75807c;
+  font-size: 9px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.authorization-copy {
+  padding: 22px 24px 28px;
+}
+.authorization-copy section + section {
+  margin-top: 20px;
+}
+.authorization-copy h3 {
+  margin: 0 0 7px;
+  font-size: 13px;
+}
+.authorization-copy p,
+.authorization-copy li {
+  margin: 0;
+  color: #3d4b47;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.authorization-copy ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.authorization-copy li + li {
+  margin-top: 3px;
+}
+.authorization-copy aside {
+  margin-top: 24px;
+  padding: 12px 14px;
+  border-left: 3px solid #3f776c;
+  background: #e4e9e2;
+  color: #53615d;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.authorization-footer {
+  padding: 18px 28px 22px;
+  border-top: 1px solid #29494d;
+  background: #0b1d1f;
+}
+.authorization-consent {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  color: #d8e8e4;
+  cursor: pointer;
+}
+.authorization-consent.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.authorization-consent input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: #68e0c1;
+}
+.authorization-consent span {
+  display: grid;
+  gap: 3px;
+}
+.authorization-consent small {
+  color: #8da9a3;
+  font-size: 11px;
+  font-weight: 500;
+}
+.authorization-read-hint {
+  margin: 8px 0 0 30px;
+  color: #f1d98d;
+  font-size: 11px;
+}
+.authorization-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 17px;
+}
+.authorization-actions button {
+  justify-self: auto;
+}
+.authorization-actions .text-button {
+  border: 1px solid #45625e;
+  background: transparent;
+  color: #b8d2cd;
+}
 form {
   display: grid;
   gap: 12px;
@@ -555,5 +799,48 @@ button:disabled {
   }
   .policy-grid .wide {
     grid-column: auto;
+  }
+  .authorization-overlay {
+    align-items: end;
+    padding: 0;
+  }
+  .authorization-dialog {
+    grid-template-rows: auto auto minmax(180px, 1fr) auto;
+    max-height: 94vh;
+    border-radius: 22px 22px 0 0;
+  }
+  .authorization-header {
+    padding: 20px 20px 14px;
+  }
+  .authorization-progress {
+    margin-bottom: 14px;
+  }
+  .authorization-document {
+    margin: 0 14px;
+  }
+  .authorization-document-heading,
+  .authorization-copy {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .authorization-parties {
+    grid-template-columns: 1fr;
+    padding: 0 18px;
+  }
+  .authorization-parties > div {
+    padding: 13px 0;
+  }
+  .authorization-parties > div + div {
+    padding-left: 0;
+    border-top: 1px solid #d6d0c2;
+    border-left: 0;
+  }
+  .authorization-footer {
+    padding: 16px 20px max(18px, env(safe-area-inset-bottom));
+  }
+  .authorization-actions button {
+    flex: 1;
+    padding-left: 14px;
+    padding-right: 14px;
   }
 }

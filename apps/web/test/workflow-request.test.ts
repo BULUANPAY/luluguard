@@ -22,6 +22,24 @@ test("accepts the explicit payment confirmation sent by the UI", () => {
   assert.equal(request.workflowAction, "payment");
 });
 
+test("accepts the estimate and authorization confirmation sent by the UI", () => {
+  const request = parseWorkflowRequest({
+    messages: [
+      {
+        role: "user",
+        content:
+          "我確認進口商預估，並已閱讀及同意訂單 ORDER-1 的報關作業委託書，授權將本訂單文件送交報關行詢價並比較差異。",
+      },
+    ],
+    workflowAction: "broker_quote",
+    orderId: "ORDER-1",
+    preflightId: "PREFLIGHT-1",
+  });
+
+  assert.equal(request.estimateApproved, true);
+  assert.equal(request.workflowAction, "broker_quote");
+});
+
 test("rejects a payment action without explicit approval", () => {
   assert.throws(
     () =>
