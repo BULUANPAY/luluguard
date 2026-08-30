@@ -14,11 +14,13 @@ body {
 main {
   min-height: 100vh;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: 32px 18px;
 }
 .panel {
   width: min(900px, 100%);
+  min-width: 0;
   padding: 40px;
   border: 1px solid #28545a;
   border-radius: 24px;
@@ -124,6 +126,7 @@ h1 {
   color: #68e0c1;
 }
 .documents {
+  min-width: 0;
   margin-top: 28px;
   padding: 20px;
   border: 1px solid #28545a;
@@ -232,7 +235,7 @@ h1 {
   color: #b8d2cd;
   font-size: 13px;
 }
-.order-field select { border: 1px solid #35636a; border-radius: 12px; padding: 11px 13px; background: #071214; color: inherit; font: inherit; }
+.order-field select { width: 100%; min-width: 0; border: 1px solid #35636a; border-radius: 12px; padding: 11px 13px; background: #071214; color: inherit; font: inherit; }
 .upload-panel { margin-top: 20px; padding: 20px; border: 1px solid #28545a; border-radius: 18px; background: #081719aa; }
 .upload-form { margin-top: 0; }
 .upload-form label { display: grid; gap: 7px; color: #b8d2cd; font-size: 13px; }
@@ -324,18 +327,82 @@ form {
 .message.user span {
   text-align: right;
 }
-.message p {
+.message-content {
   margin: 0;
   padding: 12px 15px;
   border-radius: 16px 16px 16px 4px;
   background: #17373b;
-  white-space: pre-wrap;
   line-height: 1.6;
 }
-.message.user p {
+.message.user .message-content {
   border-radius: 16px 16px 4px 16px;
   background: #68e0c1;
   color: #06201a;
+  white-space: pre-wrap;
+}
+.markdown {
+  overflow-x: auto;
+}
+.markdown > :first-child {
+  margin-top: 0;
+}
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+.markdown p,
+.markdown ul,
+.markdown ol,
+.markdown blockquote,
+.markdown pre,
+.markdown table,
+.markdown hr {
+  margin: 0.75em 0;
+}
+.markdown ul,
+.markdown ol {
+  padding-left: 1.5em;
+}
+.markdown li + li {
+  margin-top: 0.25em;
+}
+.markdown blockquote {
+  padding-left: 0.9em;
+  border-left: 3px solid #68e0c1;
+  color: #b8d2cd;
+}
+.markdown code {
+  border-radius: 5px;
+  padding: 0.15em 0.35em;
+  background: #071214;
+  color: #b8f3e4;
+  font-size: 0.9em;
+}
+.markdown pre {
+  overflow-x: auto;
+  border-radius: 10px;
+  padding: 12px;
+  background: #071214;
+}
+.markdown pre code {
+  padding: 0;
+  background: transparent;
+}
+.markdown a {
+  color: #8ef0d5;
+}
+.markdown table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.markdown th,
+.markdown td {
+  border: 1px solid #41666a;
+  padding: 6px 9px;
+  text-align: left;
+}
+.markdown hr {
+  border: 0;
+  border-top: 1px solid #41666a;
 }
 label {
   font-weight: 700;
@@ -468,7 +535,16 @@ button:disabled {
     gap: 6px;
   }
   .workflow-status {
-    grid-template-columns: 1fr;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(230px, 82%);
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+  }
+  .workflow-status span {
+    scroll-snap-align: center;
   }
   .admin-auth {
     align-items: stretch;
