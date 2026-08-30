@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "react-router build",
-    "dev": "react-router dev",
+    "build": "node --env-file-if-exists=../../.env node_modules/@react-router/dev/bin.cjs build",
+    "dev": "node --env-file-if-exists=../../.env node_modules/@react-router/dev/bin.cjs dev",
     "lint": "eslint . --max-warnings 0",
     "check-types": "react-router typegen && tsc --noEmit",
     "test": "vitest run"

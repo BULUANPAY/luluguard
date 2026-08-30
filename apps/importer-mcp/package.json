@@ -6,9 +6,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check-types": "tsc --noEmit",
-    "dev": "tsx watch src/mcp-server.ts",
+    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/mcp-server.ts",
     "lint": "eslint .",
-    "start": "node dist/src/mcp-server.js",
+    "start": "node --env-file-if-exists=../../.env dist/src/mcp-server.js",
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
@@ -19,7 +19,6 @@
     "@x402/core": "^2.23.0",
     "@x402/evm": "^2.23.0",
     "@x402/fetch": "^2.23.0",
-    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "viem": "^2.56.0",
     "zod": "^3.25.76"
