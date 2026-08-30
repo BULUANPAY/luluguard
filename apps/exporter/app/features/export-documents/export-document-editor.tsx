@@ -1,7 +1,7 @@
 import { Button } from "@luluguard/ui/components/button";
 import { Input } from "@luluguard/ui/components/input";
 import { Database, Send } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import type {
   ExportDocument,
@@ -19,16 +19,19 @@ export function ExportDocumentEditor({
   isSubmitting,
   onChange,
   onSubmit,
+  onTestDataSetChange,
   onUseTestData,
+  testDataSet,
 }: {
   document: ExportDocument;
   error?: string;
   isSubmitting: boolean;
   onChange: (document: ExportDocument) => void;
   onSubmit: () => void;
+  onTestDataSetChange: (dataSet: TestDataSet) => void;
   onUseTestData: (dataSet: TestDataSet) => void;
+  testDataSet: TestDataSet;
 }) {
-  const [testDataSet, setTestDataSet] = useState<TestDataSet>("UNICORN");
   const update: UpdateDocument = (mutate) => {
     const nextDocument = structuredClone(document);
     mutate(nextDocument);
@@ -53,7 +56,7 @@ export function ExportDocumentEditor({
         <div className="flex flex-wrap items-end gap-2">
           <SelectField
             label="測試資料"
-            onChange={(value) => setTestDataSet(value as TestDataSet)}
+            onChange={(value) => onTestDataSetChange(value as TestDataSet)}
             options={["UNICORN", "UFO"]}
             optionLabels={{ UNICORN: "獨角獸 10,000 頭", UFO: "飛碟 50 台" }}
             value={testDataSet}

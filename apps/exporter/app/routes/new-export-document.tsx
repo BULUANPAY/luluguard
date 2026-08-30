@@ -18,6 +18,7 @@ import {
   createTestExportDocument,
   parseExportDocument,
   type ExportDocumentType,
+  type TestDataSet,
 } from "../features/export-documents/export-document";
 import { downloadSignedResponse } from "../features/export-documents/response-download";
 import {
@@ -83,13 +84,18 @@ function ExportDocumentWorkspace({
   const [document, setDocument] = useState(() =>
     createEmptyExportDocument(documentType, exporterCompany),
   );
+  const [testDataSet, setTestDataSet] = useState<TestDataSet>("UNICORN");
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [error, setError] = useState<string>();
   const [envelope, setEnvelope] = useState<SignedExportDocumentEnvelope>();
   const [isSignDialogOpen, setIsSignDialogOpen] = useState(false);
 
   const switchDocumentType = (nextType: ExportDocumentType) => {
-    const nextDocument = createEmptyExportDocument(nextType, exporterCompany);
+    const nextDocument = createTestExportDocument(
+      nextType,
+      exporterCompany,
+      testDataSet,
+    );
     setDocumentType(nextType);
     setDocument(nextDocument);
     setSubmitState("idle");
@@ -182,7 +188,9 @@ function ExportDocumentWorkspace({
                 setEnvelope(undefined);
               }}
               onSubmit={() => setIsSignDialogOpen(true)}
+              onTestDataSetChange={setTestDataSet}
               onUseTestData={(dataSet) => {
+                setTestDataSet(dataSet);
                 setDocument(
                   createTestExportDocument(
                     documentType,
@@ -194,6 +202,7 @@ function ExportDocumentWorkspace({
                 setError(undefined);
                 setEnvelope(undefined);
               }}
+              testDataSet={testDataSet}
             />
 
             {isSignDialogOpen ? (
