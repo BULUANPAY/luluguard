@@ -494,6 +494,7 @@ export class ImporterAgent {
     const current = this.findSettlementReconciliation(identity);
     if (current === undefined || current.record.attemptId !== attemptId) return false;
     this.validateTerminalFailure(terminalSettlement);
+    this.validateReconciliationTransaction(current.record, terminalSettlement);
     if (!this.clearSettlementReconciliation(identity, attemptId)) return false;
     for (const reservationId of reconciliationReservationIds(current.record)) {
       this.paymentReservations.release(reservationId);
@@ -511,6 +512,20 @@ export class ImporterAgent {
       terminalErrorReason: terminalSettlement.errorReason
     });
     return true;
+  }
+
+  private validateReconciliationTransaction(
+    record: SettlementReconciliationRecord,
+    terminalSettlement: SettleResponse
+  ): void {
+    const recordedTransaction = record.settlement?.transaction;
+    if (recordedTransaction === undefined || recordedTransaction === "") return;
+    if (!isNonZeroTransactionHash(recordedTransaction)) {
+      throw new Error("Recorded reconciliation transaction is not a valid non-zero 32-byte hash");
+    }
+    if (terminalSettlement.transaction.toLowerCase() !== recordedTransaction.toLowerCase()) {
+      throw new Error("Reconciled settlement transaction does not match the recorded transaction");
+    }
   }
 
   private recordSettlementReconciliation(

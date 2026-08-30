@@ -854,13 +854,14 @@ test("settlement_pending is shared across importer agent instances and blocks re
   const history: import("../src/payment/policy.js").PaymentRecord[] = [];
   const pendingStore = new Map<string, SettlementReconciliationRecord>();
   const reservationStore = new PaymentReservationStore();
+  const pendingTransaction = `0x${"b".repeat(64)}`;
   const failedPaidFetch = fakePaidFetch(
     undefined,
     402,
     encodePaymentResponseHeader({
       success: false,
       errorReason: "settlement_pending",
-      transaction: "",
+      transaction: pendingTransaction,
       network,
       payer: importerAddress
     })
@@ -925,7 +926,7 @@ test("settlement_pending is shared across importer agent instances and blocks re
   assert.equal(reservationStore.get(reconciliation!.reservationId!)?.state, "ambiguous");
   const terminalFailure: SettleResponse = {
     success: false,
-    transaction: "",
+    transaction: `0x${"c".repeat(64)}`,
     network,
     errorReason: "reverted"
   };
@@ -939,16 +940,65 @@ test("settlement_pending is shared across importer agent instances and blocks re
     false
   );
   assert.equal(
-    secondAgent.markSettlementReconciled(
+    secondAgent.getSettlementReconciliation(quoteId)?.settlement?.transaction,
+    pendingTransaction
+  );
+  assert.throws(
+    () => secondAgent.markSettlementReconciled(
       "TEST-SHARED-PENDING",
       quoteId,
       reconciliation!.attemptId,
       terminalFailure
     ),
+    /transaction.*recorded/i
+  );
+  assert.ok(secondAgent.getSettlementReconciliation(quoteId));
+  assert.equal(reservationStore.get(reconciliation!.reservationId!)?.state, "ambiguous");
+  assert.equal(
+    secondAgent.markSettlementReconciled(
+      "TEST-SHARED-PENDING",
+      quoteId,
+      reconciliation!.attemptId,
+      { ...terminalFailure, transaction: `0x${"B".repeat(64)}` }
+    ),
     true
   );
   assert.equal(secondAgent.getSettlementReconciliation(quoteId), undefined);
   assert.equal(reservationStore.get(reconciliation!.reservationId!), undefined);
+});
+
+test("invalid recorded reconciliation transactions cannot be treated as missing", async () => {
+  for (const [label, recordedTransaction] of [
+    ["whitespace", "   "],
+    ["padded hash", ` 0x${"b".repeat(64)} `]
+  ] as const) {
+    const agent = createAgent(undefined, fakePaidFetch(
+      undefined,
+      402,
+      encodePaymentResponseHeader({
+        success: false,
+        errorReason: "settlement_pending",
+        transaction: recordedTransaction,
+        network,
+        payer: importerAddress
+      })
+    ));
+    const orderId = `TEST-INVALID-RECORDED-${label}`;
+    await precheckAndQuote(agent, orderId);
+    await assert.rejects(() => agent.submit(orderId, quoteId, true), /settlement_pending/);
+    const reconciliation = agent.getSettlementReconciliation(quoteId);
+    assert.ok(reconciliation);
+    assert.throws(
+      () => agent.markSettlementReconciled(
+        orderId,
+        quoteId,
+        reconciliation.attemptId,
+        { success: false, transaction: "", network, errorReason: "reverted" }
+      ),
+      /Recorded reconciliation transaction is not a valid non-zero 32-byte hash/
+    );
+    assert.ok(agent.getSettlementReconciliation(quoteId));
+  }
 });
 
 test("failed settlement keeps the quote available for a valid retry", async () => {

@@ -58,8 +58,7 @@ async function seedReconciliation(): Promise<{
   const pendingSettlement: SettleResponse = {
     success: false,
     errorReason: "settlement_pending",
-    transaction:
-      "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    transaction: `0x${"b".repeat(64)}`,
     network,
   };
   const paidFetch: PaymentDispatchAwareFetch = Object.assign(
@@ -177,7 +176,7 @@ test("terminal failed settlement resolves only the current reconciliation owner"
     );
     assert.equal(wrongAttempt.status, 409);
 
-    const resolved = await fetch(`${baseUrl}/admin/reconciliation/resolve`, {
+    const mismatched = await fetch(`${baseUrl}/admin/reconciliation/resolve`, {
       method: "POST",
       headers: { ...adminHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -185,6 +184,28 @@ test("terminal failed settlement resolves only the current reconciliation owner"
         quoteId,
         attemptId: record.attemptId,
         settlement: terminalFailure,
+      }),
+    });
+    assert.equal(mismatched.status, 400);
+    assert.match((await mismatched.json()).error, /transaction.*recorded/i);
+    const stillPending = await fetch(
+      `${baseUrl}/admin/reconciliation/${quoteId}`,
+      { headers: adminHeaders() },
+    );
+    assert.equal(stillPending.status, 200);
+    assert.notDeepEqual(stores.paymentReservationStore.listForQuote(quoteId), []);
+
+    const resolved = await fetch(`${baseUrl}/admin/reconciliation/resolve`, {
+      method: "POST",
+      headers: { ...adminHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId,
+        quoteId,
+        attemptId: record.attemptId,
+        settlement: {
+          ...terminalFailure,
+          transaction: record.settlement?.transaction,
+        },
       }),
     });
     assert.equal(resolved.status, 200);

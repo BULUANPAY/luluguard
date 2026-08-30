@@ -142,7 +142,7 @@ curl -X POST \
   }'
 ```
 
-The API rejects successful settlements, `settlement_pending`, mismatched attempts, and wrong network, payer, or amount values. It does not perform the external on-chain investigation for the operator.
+The API rejects successful settlements, `settlement_pending`, mismatched attempts, and wrong network, payer, or amount values. If the reconciliation record already contains a transaction hash, the terminal failure evidence must reference the same transaction. The API does not perform the external on-chain investigation for the operator.
 
 ## Validation
 
