@@ -94,18 +94,14 @@ packages/
 nvm use
 git submodule update --init --recursive
 pnpm install
-cp apps/importer-mcp/.env.example apps/importer-mcp/.env
-cp apps/web/.env.local.example apps/web/.env.local
-cp apps/customs-broker/.env.example apps/customs-broker/.env
+cp .env.example .env
 ```
 
-兩個產生的環境檔都已由 Git 忽略。所有 placeholder 必須在 Demo 前替換；Web 與 Importer MCP 的 `MCP_API_KEY` 必須完全相同。
-
-`apps/customs-broker/.env` 也已由 Git 忽略；Importer 與 customs broker 的 `CUSTOMS_BROKER_ADDRESS`、`CUSTOMS_BROKER_FEE_USDC` 與 `X402_NETWORK` 必須一致。
+所有 app 都會讀取 repository root 的 `.env`，此檔已由 Git 忽略。所有 placeholder 必須在 Demo 前替換；共用變數只需設定一次。
 
 ### Web 環境變數
 
-設定 `apps/web/.env.local`：
+在 root `.env` 設定 Web 相關變數：
 
 | 變數                             | 說明                                           |
 | -------------------------------- | ---------------------------------------------- |
@@ -119,11 +115,11 @@ cp apps/customs-broker/.env.example apps/customs-broker/.env
 | `VLEI_VERIFY_MCP_*`              | 可選的 verifier command、args 與 cwd override  |
 | `AUDIT_LOG_*`                    | audit 開關、路徑與單一值長度上限               |
 
-修改 `.env.local` 後要重新啟動 Next.js。
+修改 `.env` 後要重新啟動 Next.js。
 
 ### Importer MCP 環境變數
 
-設定 `apps/importer-mcp/.env`：
+在同一份 root `.env` 設定 Importer MCP 相關變數：
 
 | 變數群組        | 變數                                                                                               |
 | --------------- | -------------------------------------------------------------------------------------------------- |
@@ -146,7 +142,7 @@ pnpm --filter @repo/vlei-json-signing build
 node --input-type=module -e 'import { VleiJsonSigning } from "./packages/vlei-json-signing/dist/index.js"; console.log(await VleiJsonSigning.deriveRootAid(process.env.VLEI_ROOT_SEED));'
 ```
 
-將輸出值填入 `apps/importer-mcp/.env` 的 `VLEI_EXPECTED_ROOT_AID`，不要把 seed 填進該欄位。
+將輸出值填入 root `.env` 的 `VLEI_EXPECTED_ROOT_AID`，不要把 seed 填進該欄位。
 
 ## 啟動方式
 

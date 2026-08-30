@@ -3,8 +3,9 @@ import { basename, dirname, resolve } from "node:path";
 
 const moduleParent = dirname(import.meta.dirname);
 const appRoot = basename(moduleParent) === "dist" ? dirname(moduleParent) : moduleParent;
+const workspaceRoot = resolve(appRoot, "../..");
 
-loadEnv({ path: resolve(appRoot, ".env"), override: false, quiet: true });
+loadEnv({ path: resolve(workspaceRoot, ".env"), override: false, quiet: true });
 
 export interface BrokerConfig {
   host: string;
