@@ -685,7 +685,7 @@ test("blocks an inconsistent DPP before customs transmission", () => {
   );
 });
 
-test("submits the validated DPP and low-carbon decision at customs filing", async () => {
+test("submits the validated DPP without leaking the importer review to the broker", async () => {
   let submittedBody: unknown;
   const paidFetch = withDispatchTracking(async (_input, init) => {
     submittedBody = JSON.parse(String(init?.body));
@@ -697,15 +697,10 @@ test("submits the validated DPP and low-carbon decision at customs filing", asyn
 
   const body = submittedBody as {
     documents: ReturnType<typeof getMockExportDocuments>;
-    documentReview: {
-      lowCarbonAssessment: { qualifiesAsLowCarbonProduct: boolean };
-    };
+    documentReview?: unknown;
   };
   assert.ok(body.documents.digitalProductPassport);
-  assert.equal(
-    body.documentReview.lowCarbonAssessment.qualifiesAsLowCarbonProduct,
-    true,
-  );
+  assert.equal(body.documentReview, undefined);
 });
 
 test("invalid invoice and packing values are blocked before broker transmission", async () => {

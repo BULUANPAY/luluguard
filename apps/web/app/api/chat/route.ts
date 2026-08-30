@@ -221,6 +221,12 @@ export async function POST(request: Request) {
           description: tool.description,
           inputSchema: tool.inputSchema as Record<string, unknown>,
         }));
+      const singleUseToolResults = new Map<string, string>();
+      const singleUseTools = new Set([
+        "review_import_documents",
+        "get_import_quote",
+        "submit_import_declaration",
+      ]);
       return generateAiAnswer({
         traceId,
         agentRunId,
@@ -230,9 +236,24 @@ export async function POST(request: Request) {
           sessionId: session.sessionId,
         },
         messages,
-        instructions: `${instructions}\n本次動作：${workflowAction}。前端訂單編號：${body.orderId ?? "未提供"}。文件來源僅限於該訂單在 uploaded-files 內的所有檔案。preflightId：${body.preflightId ?? "無"}。quoteId：${body.quoteId ?? "無"}。${workflowAction === "payment" ? "使用者已按下付款核准按鈕，你必須呼叫 submit_import_declaration。" : ""}`,
+        instructions: `${instructions}\n本次動作：${workflowAction}。前端訂單編號：${body.orderId ?? "未提供"}。文件來源僅限於該訂單在 uploaded-files 內的所有檔案。preflightId：${body.preflightId ?? "無"}。quoteId：${body.quoteId ?? "無"}。受控 workflow 工具在本次 Agent run 只能呼叫一次；不論成功或失敗都不得重試，必須直接說明第一次結果。${workflowAction === "payment" ? "使用者已按下付款核准按鈕，你必須呼叫 submit_import_declaration 一次。" : ""}`,
         tools,
         callTool: async (name, args) => {
+          if (singleUseTools.has(name) && singleUseToolResults.has(name)) {
+            const firstResult = singleUseToolResults.get(name)!;
+            writeAudit({
+              traceId,
+              component: "mcp-client",
+              action: "tool.replay-blocked",
+              status: "blocked",
+              actor: "ai-agent",
+              data: { name, reason: "SINGLE_USE_TOOL_ALREADY_CALLED" },
+            });
+            return `禁止重複呼叫 ${name}；請直接向使用者說明第一次執行結果：${firstResult}`;
+          }
+          if (singleUseTools.has(name)) {
+            singleUseToolResults.set(name, "工具第一次呼叫仍在執行中");
+          }
           if (name === "verify_uploaded_vlei_documents") {
             if (!body.orderId) throw new Error("驗證已上傳文件時必須提供 orderId");
             const verification = await verifyUploadedVleiDocuments(body.orderId);
@@ -292,7 +313,14 @@ export async function POST(request: Request) {
               actor: "mcp-server",
               data: { name, arguments: args, output },
             });
+            if (singleUseTools.has(name)) singleUseToolResults.set(name, output);
           } catch (error) {
+            if (singleUseTools.has(name)) {
+              singleUseToolResults.set(
+                name,
+                error instanceof Error ? error.message : String(error),
+              );
+            }
             writeAudit({
               traceId,
               spanId: toolCallId,
