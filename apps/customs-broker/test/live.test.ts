@@ -34,7 +34,12 @@ const documents: ExportDocuments = {
   grossWeightKg: 18.4,
   netWeightKg: 15.2,
   billOfLadingNumber: "ONEYTYOLIVE",
-  providedDocuments: ["commercial_invoice", "packing_list", "bill_of_lading"],
+  providedDocuments: [
+    "commercial_invoice",
+    "packing_list",
+    "bill_of_lading",
+    "power_of_attorney"
+  ],
   items: [{
     description: "Industrial digital temperature sensors",
     model: "TSP-500",

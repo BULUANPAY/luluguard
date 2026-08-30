@@ -1,4 +1,11 @@
+import {
+  REQUIRED_TRADE_DOCUMENT_TYPES,
+  TRADE_DOCUMENT_TYPES,
+  type TradeDocumentType
+} from "@luluguard/shared";
 import { z } from "zod";
+
+export type { TradeDocumentType };
 
 export const MAX_MONEY_USD = 1_000_000_000;
 export const MAX_QUANTITY = 1_000_000;
@@ -28,22 +35,11 @@ const money = z.number()
   .refine(hasAtMostTwoDecimalPlaces, "must have at most two decimal places");
 const positiveInteger = (max: number) => z.number().finite().int().positive().max(max);
 
-export const tradeDocumentTypes = [
-  "commercial_invoice",
-  "packing_list",
-  "bill_of_lading",
-  "certificate_of_origin",
-  "product_specification",
-  "import_permit"
-] as const;
+export const tradeDocumentTypes = TRADE_DOCUMENT_TYPES.map(
+  (document) => document.type
+) as [TradeDocumentType, ...TradeDocumentType[]];
 
-export type TradeDocumentType = (typeof tradeDocumentTypes)[number];
-
-export const requiredTradeDocumentTypes = [
-  "commercial_invoice",
-  "packing_list",
-  "bill_of_lading"
-] as const satisfies readonly TradeDocumentType[];
+export const requiredTradeDocumentTypes = REQUIRED_TRADE_DOCUMENT_TYPES;
 
 export const TradeItemSchema = z.object({
   description: boundedText(500),

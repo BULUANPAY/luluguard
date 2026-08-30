@@ -20,6 +20,9 @@ importers:
 
   apps/customs-broker:
     dependencies:
+      '@luluguard/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@x402/core':
         specifier: 2.24.0
         version: 2.24.0

@@ -47,7 +47,12 @@ const documents: ExportDocuments = {
   grossWeightKg: 18.4,
   netWeightKg: 15.2,
   billOfLadingNumber: "ONEYTYOTEST",
-  providedDocuments: ["commercial_invoice", "packing_list", "bill_of_lading"],
+  providedDocuments: [
+    "commercial_invoice",
+    "packing_list",
+    "bill_of_lading",
+    "power_of_attorney"
+  ],
   items: [{
     description: "Industrial digital temperature sensors",
     model: "TSP-500",
@@ -228,21 +233,45 @@ test("health and free quotation do not require payment", async (t) => {
   assert.deepEqual(running.facilitator.events, ["supported"]);
 });
 
-test("schema and required-document validation fail before payment", async (t) => {
+test("optional bill of lading passes validation before payment", async (t) => {
   const running = await start();
   t.after(() => close(running.server));
   const missingBillOfLading = {
     ...documents,
     billOfLadingNumber: undefined,
-    providedDocuments: ["commercial_invoice", "packing_list"] as const
+    providedDocuments: [
+      "commercial_invoice",
+      "packing_list",
+      "power_of_attorney"
+    ] as const
   };
   const response = await fetch(`${running.baseUrl}/customs/quotes`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(missingBillOfLading)
   });
+  assert.equal(response.status, 200);
+  assert.deepEqual(running.facilitator.events, ["supported"]);
+});
+
+test("required-document validation fails before payment", async (t) => {
+  const running = await start();
+  t.after(() => close(running.server));
+  const missingPackingList = {
+    ...documents,
+    providedDocuments: [
+      "commercial_invoice",
+      "bill_of_lading",
+      "power_of_attorney"
+    ] as const
+  };
+  const response = await fetch(`${running.baseUrl}/customs/quotes`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(missingPackingList)
+  });
   assert.equal(response.status, 400);
-  assert.match((await response.json() as { error: string }).error, /bill_of_lading/);
+  assert.match((await response.json() as { error: string }).error, /packing_list/);
   assert.deepEqual(running.facilitator.events, ["supported"]);
 });
 

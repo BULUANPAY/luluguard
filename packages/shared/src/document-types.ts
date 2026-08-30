@@ -52,6 +52,13 @@ export const TRADE_DOCUMENT_TYPES = [
     required: false,
     providedByExporter: false,
   },
+  {
+    type: "power_of_attorney",
+    label: "委任書",
+    detail: "報關委任關係與授權範圍",
+    required: true,
+    providedByExporter: false,
+  },
 ] as const;
 
 export type TradeDocumentType = (typeof TRADE_DOCUMENT_TYPES)[number]["type"];
