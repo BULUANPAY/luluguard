@@ -15,6 +15,7 @@ const EVM_ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 const TRANSACTION_PATTERN = /^0x[a-fA-F0-9]{64}$/;
 
 const boundedText = (max: number) => z.string().trim().min(1).max(max);
+const optionalItemText = (max: number) => z.string().trim().max(max).optional();
 
 /**
  * A JavaScript number cannot represent every decimal exactly. Compare in
@@ -69,11 +70,15 @@ export const requiredTradeDocumentTypes = REQUIRED_TRADE_DOCUMENT_TYPES;
 export const TradeItemSchema = z.object({
   description: boundedText(500),
   model: boundedText(256),
-  material: boundedText(256),
-  intendedUse: boundedText(500),
+  // Some exporter invoice formats do not contain customs-classification
+  // enrichment fields. Accept them when absent (or normalized to an empty
+  // string by the importer) so the broker can still produce an advisory quote.
+  material: optionalItemText(256),
+  intendedUse: optionalItemText(500),
   quantity: positiveInteger(MAX_QUANTITY),
   unitPriceUsd: money,
-  hsCode: z.string().trim().min(1).max(32).optional()
+  hsCode: z.string().trim().min(1).max(32).optional(),
+  dppBatchId: boundedText(256).optional()
 }).strict().superRefine((item, context) => {
   const itemUnitPriceCents = Math.round(item.unitPriceUsd * 100);
   const itemValueCents = item.quantity * itemUnitPriceCents;
@@ -85,6 +90,33 @@ export const TradeItemSchema = z.object({
     });
   }
 });
+
+export const DigitalProductPassportSchema = z.object({
+  documentId: boundedText(256),
+  dppId: boundedText(256),
+  product: z.object({
+    name: boundedText(500),
+    model: boundedText(256),
+    hsCode: boundedText(32),
+    batchId: boundedText(256),
+    quantity: positiveInteger(MAX_QUANTITY),
+    unit: boundedText(64)
+  }).strict(),
+  carbonFootprint: z.object({
+    productCarbonFootprintKgCo2e: z.number().finite().nonnegative().max(MAX_MONEY_USD),
+    baselineKgCo2e: z.number().finite().positive().max(MAX_MONEY_USD),
+    claimedReductionPercent: z.number().finite().min(0).max(100),
+    methodology: boundedText(500),
+    systemBoundary: boundedText(500),
+    verificationStandard: boundedText(256),
+    verifiedBy: boundedText(500),
+    verifiedAt: boundedText(64)
+  }).strict(),
+  validity: z.object({
+    validFrom: boundedText(64),
+    validUntil: boundedText(64)
+  }).strict()
+}).strict();
 
 export const ExportDocumentsSchema = z.object({
   invoiceNumber: boundedText(128),
@@ -104,6 +136,7 @@ export const ExportDocumentsSchema = z.object({
   certificateOfOriginNumber: z.string().trim().min(1).max(128).optional(),
   importPermitNumber: z.string().trim().min(1).max(128).optional(),
   powerOfAttorney: CustomsPowerOfAttorneySchema.optional(),
+  digitalProductPassport: DigitalProductPassportSchema.optional(),
   providedDocuments: z.array(z.enum(tradeDocumentTypes))
     .min(1)
     .max(tradeDocumentTypes.length)
