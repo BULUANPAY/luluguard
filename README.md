@@ -8,21 +8,33 @@ LuLuGuard 是一個可實際操作的進口商 AI Agent POC。它將「讀取貿
 
 ## 交件入口
 
-| 交件項目                                      | 連結或位置                                                               | 狀態                                         |
-| --------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------- |
-| 程式碼 repository                             | [github.com/BULUANPAY/luluguard](https://github.com/BULUANPAY/luluguard) | 已提供                                       |
-| Demo Day 簡報（含「治理／信任設計說明」一頁） | **`<DEMO_DAY_SLIDES_URL>`**                                              | 提交前必須替換為可公開開啟的連結             |
-| 線上 Demo                                     | **`<LIVE_DEMO_URL>`**                                                    | 若無線上環境，請刪除此列                     |
-| 展示影片                                      | **`<DEMO_VIDEO_URL>`**                                                   | 線上 Demo 與影片至少提供一項；提交前必須替換 |
-| 執行、展示及第三方套件說明                    | 本 README                                                                | 已提供                                       |
+| 交件項目                                      | 連結或位置                                                               | 狀態                             |
+| --------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------- |
+| 程式碼 repository                             | [github.com/BULUANPAY/luluguard](https://github.com/BULUANPAY/luluguard) | 已提供                           |
+| Demo Day 簡報（含「治理／信任設計說明」一頁） | **`<DEMO_DAY_SLIDES_URL>`**                                              | 提交前必須替換為可公開開啟的連結 |
+| 展示影片                                      | **`<DEMO_VIDEO_URL>`**                                                   | 提交前必須替換為可公開開啟的連結 |
+| 執行、展示及第三方套件說明                    | 本 README                                                                | 已提供                           |
 
 提交前請以無痕視窗逐一開啟上列連結，確認評審不需加入組織、登入私人帳號或提出存取申請。不要保留任何 `<...>` 佔位符。
+
+### 目前符合情況
+
+| 驗收項目                        | 判定       | 說明                                                                                                 |
+| ------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
+| 可運作 POC 與六項信任機制       | 符合       | 有實際 UI、MCP、customs broker、x402 flow、server-side blockers、audit 及自動測試，不是純 mockup     |
+| Repository                      | 符合       | 已提供 repository 連結；提交前仍須以無痕視窗確認評審可直接存取                                       |
+| README                          | 符合       | 包含安裝、啟動、展示、第三方套件、測試資料及 POC 限制                                                |
+| Demo Day 簡報                   | **尚缺**   | 尚未提供可公開開啟的簡報連結；必須包含一頁「治理／信任設計說明」                                     |
+| 實際操作影片                    | **尚缺**   | 本作品沒有線上 Demo，必須提供影片；影片須顯示真實操作及阻擋結果，不能只有投影片                      |
+| Base Sepolia 完整 live E2E 預演 | 提交前確認 | 離線自動測試不會花費測試幣；仍需用 Demo 當天的 wallet、Facilitator 與網路執行 opt-in live smoke test |
+
+因此，程式與 README 已具備 POC 交件基礎，但在補上簡報及展示影片連結並完成 live E2E 預演前，還不能視為全部交件完成。
 
 ## POC 能展示什麼
 
 1. 員工以 sandbox 帳號登入；不同角色具有不同的 Agent 動作權限。
 2. 每個預檢、詢價或付款動作都產生短效、單次使用、綁定 action 與 resource 的 vLEI Agent Authorization。
-3. Agent 讀取實際上傳的 JSON 貿易文件，檢查必備文件與欄位，並驗證 DPP 產品／批次、碳足跡計算、第三方查證資料及有效期限。
+3. Agent 讀取實際上傳的 JSON 貿易文件；預檢會自動驗證所有 vLEI envelope 的簽章、可信 root AID，以及簽發者 LEI 是否符合文件提供方，再檢查必備文件、欄位與 DPP 內容。
 4. Agent 先在進口商端產生獨立估價；使用者確認前不把文件送給報關行。
 5. 收到報價後，Agent 比對金額、稅率、報關行費用、收款地址與報價效期；付款前再次要求明確人工核准。
 6. x402 支付受 allowlist、單筆上限、24 小時累計、每小時次數、人工核准門檻與 kill switch 約束。
@@ -32,16 +44,16 @@ LuLuGuard 是一個可實際操作的進口商 AI Agent POC。它將「讀取貿
 
 此表可直接作為 Demo Day 簡報中「治理／信任設計說明」頁的內容來源。
 
-| #   | 信任機制                 | 實際控制                                                                                                                                          | Demo 現場如何證明                                                                |
-| --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| 1   | 可驗證的組織與人員身分   | 員工 session 綁定 tenant、LEI、員工與角色；每次受控動作另外簽發 vLEI Agent Authorization                                                          | 分別登入 Alice 與 Bob，畫面顯示組織、LEI、角色及可用動作                         |
-| 2   | 最小權限與可驗證委任     | 授權綁定 `agentId`、版本、action、resource、`traceId`、有效期限與 nonce；MCP 端驗章、比對可信 root AID／LEI，並拒絕跨動作、跨資源、過期或重放授權 | Bob 可預檢與詢價但不能付款；成功動作會顯示 Authorization ID、Signer AID          |
-| 3   | 資料完整性與合規前置檢查 | 可用 vLEI verifier 驗證出口文件 envelope；預檢會阻擋缺件、欄位矛盾、無效 DPP、產品／批次不一致或碳減量計算不一致的資料                            | 上傳正確文件可通過；把 DPP 減量百分比改錯後重新預檢，系統在傳送報關行前阻擋      |
-| 4   | 分階段揭露與人類決策點   | 固定流程為預檢 → 明確確認預估 → 詢價 → 明確核准付款；不能跳過階段，報價有時效且只能成功使用一次                                                   | 預檢結果明示尚未聯絡報關行；未確認預估不能詢價，未核准付款不能送件               |
-| 5   | 可程式化的資金治理       | x402 支付前重新檢查 Agent 狀態、收款 allowlist、單筆／日／時限額、人工核准門檻、報價與 compliance blocker；可選 private key 或 AWS KMS signer     | 在 Policy 頁按「暫停所有付款」後嘗試支付會被拒絕；恢復 `ACTIVE` 後才可依政策執行 |
-| 6   | 全鏈路可歸責與可稽核性   | Web、模型工具決策、MCP、政策判斷、broker 與付款事件以 `traceId` 串接；JSONL 使用 `previousHash`／`hash` 形成防竄改雜湊鏈，並遮罩敏感資料          | 完成一輪操作後執行 `pnpm audit:verify`，再用同一 `traceId` 對照兩個 audit log    |
+| #   | 信任機制                 | 實際控制                                                                                                                                          | Demo 現場如何證明                                                                    |
+| --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 1   | 可驗證的組織與人員身分   | 員工 session 綁定 tenant、LEI、員工與角色；每次受控動作另外簽發 vLEI Agent Authorization                                                          | 分別登入 Alice 與 Bob，畫面顯示組織、LEI、角色及可用動作                             |
+| 2   | 最小權限與可驗證委任     | 授權綁定 `agentId`、版本、action、resource、`traceId`、有效期限與 nonce；MCP 端驗章、比對可信 root AID／LEI，並拒絕跨動作、跨資源、過期或重放授權 | Bob 可預檢與詢價但不能付款；成功動作會顯示 Authorization ID、Signer AID              |
+| 3   | 資料完整性與合規前置檢查 | 預檢自動驗證 vLEI envelope、可信 root AID 及依文件提供方決定的 exporter／importer LEI；並阻擋缺件、欄位矛盾、無效 DPP、產品／批次或碳計算不一致   | 用錯誤 LEI 簽署出口文件，或把 DPP 減量百分比改錯；系統會說明原因並在傳送報關行前阻擋 |
+| 4   | 分階段揭露與人類決策點   | 固定流程為預檢 → 確認估價並閱讀／同意報關委任書 → 詢價 → 明確核准付款；委任只涵蓋本訂單的傳檔與詢價，不包含付款，報價有時效且只能成功使用一次     | 預檢時尚未聯絡報關行；未接受委任書不能傳檔詢價，未另行核准付款不能送件               |
+| 5   | 可程式化的資金治理       | x402 支付前重新檢查 Agent 狀態、收款 allowlist、單筆／日／時限額、人工核准門檻、報價與 compliance blocker；可選 private key 或 AWS KMS signer     | 在 Policy 頁按「暫停所有付款」後嘗試支付會被拒絕；恢復 `ACTIVE` 後才可依政策執行     |
+| 6   | 全鏈路可歸責與可稽核性   | Web、模型工具決策、MCP、政策判斷、broker 與付款事件以 `traceId` 串接；JSONL 使用 `previousHash`／`hash` 形成防竄改雜湊鏈，並遮罩敏感資料          | 完成一輪操作後執行 `pnpm audit:verify`，再用同一 `traceId` 對照兩個 audit log        |
 
-主要實作位置：[`apps/web/lib/sandbox-auth.ts`](apps/web/lib/sandbox-auth.ts)、[`apps/web/lib/vlei-authorization.ts`](apps/web/lib/vlei-authorization.ts)、[`apps/importer-mcp/src/vlei-authorization.ts`](apps/importer-mcp/src/vlei-authorization.ts)、[`apps/importer-mcp/src/payment/policy.ts`](apps/importer-mcp/src/payment/policy.ts)、[`apps/importer-mcp/src/document-review.ts`](apps/importer-mcp/src/document-review.ts) 與 [`scripts/verify-audit-log.mjs`](scripts/verify-audit-log.mjs)。
+主要實作位置：[`apps/web/lib/sandbox-auth.ts`](apps/web/lib/sandbox-auth.ts)、[`apps/web/lib/vlei-authorization.ts`](apps/web/lib/vlei-authorization.ts)、[`apps/web/lib/vlei-document-verification.ts`](apps/web/lib/vlei-document-verification.ts)、[`apps/web/app/components/letter-of-authorization.tsx`](apps/web/app/components/letter-of-authorization.tsx)、[`apps/importer-mcp/src/vlei-authorization.ts`](apps/importer-mcp/src/vlei-authorization.ts)、[`apps/importer-mcp/src/payment/policy.ts`](apps/importer-mcp/src/payment/policy.ts)、[`apps/importer-mcp/src/document-review.ts`](apps/importer-mcp/src/document-review.ts)、[`apps/customs-broker/src/app.ts`](apps/customs-broker/src/app.ts) 與 [`scripts/verify-audit-log.mjs`](scripts/verify-audit-log.mjs)。
 
 ## 系統組成
 
@@ -82,7 +94,7 @@ packages/
 - Python 3.8 以上，供 vLEI 簽章與驗章使用
 - Git submodule `vendor/vlei-sandbox`
 - Gemini 或 OpenAI API key
-- 要展示詢價與付款完整 happy path 時：相容的 customs broker API、專用 Base Sepolia 測試錢包、測試網 gas 與測試用 USDC
+- 要展示詢價與付款完整 happy path 時：repository 內建 customs broker、可連線的 x402 Facilitator、專用 Base Sepolia 測試錢包、測試網 gas 與測試用 USDC
 
 切勿把主網私鑰、正式客戶文件或真實個資放入 `.env`、`uploaded-files`、簡報或展示影片。
 
@@ -97,7 +109,7 @@ pnpm install
 cp .env.example .env
 ```
 
-所有 app 都透過 Node.js `--env-file-if-exists=../../.env` 讀取 repository root 的 `.env`，此檔已由 Git 忽略。所有 placeholder 必須在 Demo 前替換；共用變數只需設定一次。
+各 app 的 dev／build／start scripts 都會讀取 repository root 的 `.env`（Next.js 使用 `scripts/load-root-env.mjs`，其餘 Node services 使用 `--env-file-if-exists`），此檔已由 Git 忽略。所有 placeholder 必須在 Demo 前替換；共用變數只需設定一次。
 
 ### Web 環境變數
 
@@ -137,6 +149,22 @@ cp .env.example .env
 
 Importer MCP 會直接從 `VLEI_ROOT_SEED` 推導並驗證 root AID，不需要另外維護衍生值。
 
+### Customs Broker 與 x402 環境變數
+
+內建 customs broker 預設使用同一份 root `.env`：
+
+| 變數                                         | 說明                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------ |
+| `CUSTOMS_BROKER_HOST`, `CUSTOMS_BROKER_PORT` | 預設 `127.0.0.1:4021`                                                    |
+| `CUSTOMS_BROKER_ADDRESS`                     | 收取 USDC 的非零 EVM address，並須列在 Importer payment policy allowlist |
+| `CUSTOMS_BROKER_FEE_USDC`                    | 報關服務費；Importer 與 broker 必須使用相同值                            |
+| `CUSTOMS_BROKER_QUOTE_TTL_SECONDS`           | Quote 有效秒數，預設 300                                                 |
+| `X402_NETWORK`                               | 此 POC 固定支援 `eip155:84532`（Base Sepolia）                           |
+| `X402_FACILITATOR_URL`                       | x402 verify／settle facilitator URL；預設 `https://x402.org/facilitator` |
+| `X402_FACILITATOR_TIMEOUT_MS`                | Facilitator request timeout，預設 30000 ms                               |
+
+詢價由內建 broker 本機處理且不收費；只有 `POST /customs/declarations` 受到 x402 middleware 保護。完整付款仍會把 payment verification／settlement 送往設定的 Facilitator。
+
 ## 啟動方式
 
 ### 進口商主流程
@@ -152,7 +180,11 @@ curl http://127.0.0.1:4021/health
 curl http://127.0.0.1:4020/health
 ```
 
-預期回應：
+預期回應分別為：
+
+```json
+{ "status": "ok", "service": "x402-customs-broker" }
+```
 
 ```json
 { "status": "ok", "service": "x402-importer-mcp" }
@@ -208,14 +240,14 @@ Exporter 預設向 `http://localhost:3001` 簽章；可用 `VITE_VLEI_SIGNING_AP
 
 ## Demo Day 展示腳本
 
-建議先準備一組屬於同一 `orderId` 的測試 JSON：商業發票、裝箱單、海運提單與 DPP。乾淨 clone 的 `uploaded-files` 不含業務資料；可由 Exporter Demo 製作 I/V、P/L、DPP，再準備相同訂單的測試提單。完整詢價／付款另需預先確認 broker API 與 Base Sepolia 測試錢包可用。
+乾淨 clone 的 `uploaded-files` 不含業務資料。預檢最低需要同一 `orderId` 的商業發票與裝箱單；為展示資料信任機制，建議另外加入 vLEI-signed DPP，海運提單則為選用。Exporter Demo 可製作 I/V、P/L 與 DPP。報關委任書不需預先上傳，系統會在使用者確認估價並同意傳檔詢價時建立，並附上該次 vLEI Agent Authorization 證據。完整付款另需確認內建 broker、Facilitator 與 Base Sepolia 測試錢包可用。
 
 ### 主流程（約 6 分鐘）
 
 1. 開啟 `http://localhost:3000`，以 `alice / alice-demo` 登入，指出畫面上的角色、組織與 LEI。
-2. 選擇訂單並上傳四份 JSON。按「以 vLEI 授權 AI 檢查並估價」。展示文件檢查、DPP 低碳判定、獨立估價、`preflightId`，以及「尚未聯絡報關行」。
+2. 選擇訂單並上傳 I/V、P/L 與 vLEI-signed DPP。按「以 vLEI 授權 AI 檢查並估價」。展示自動驗章、簽發者 LEI 比對、文件檢查、DPP 低碳判定、獨立估價、`preflightId`，以及「尚未聯絡報關行」。
 3. 展示 Authorization ID 與 Signer AID，說明 action、resource、有效期限與 nonce 都受簽章保護。
-4. 明確確認預估後詢價。展示 `quoteId`、報價有效期限、獨立估價與 broker 報價差異，以及尚未付款。
+4. 按下詢價後閱讀報關委任書至底部，勾選同意並送出。展示委任範圍不包含付款、委任書 ID、`quoteId`、報價有效期限、獨立估價與 broker 報價差異，以及尚未付款。
 5. 按下付款核准。系統重新執行 policy 與 compliance checks，透過 x402 支付後顯示 receipt／declaration 結果。
 6. 在 terminal 執行 `pnpm audit:verify`，以同一 `traceId` 對照 Web 與 Importer MCP audit log。
 
@@ -223,6 +255,7 @@ Exporter 預設向 `http://localhost:3001` 簽章；可用 `VITE_VLEI_SIGNING_AP
 
 - **角色越權**：以 Bob 登入；取得報價後不會出現付款按鈕。
 - **資料不一致**：把 DPP 的 `reduction_percent` 改成與 footprint／baseline 不一致，重新上傳與預檢；系統會在聯絡 broker 前阻擋。
+- **錯誤簽發者**：用非訂單出口商 LEI 簽署 I/V、P/L 或 DPP；預檢會指出預期與實際 LEI，且不使用未通過驗證的 payload。
 - **人工決策點**：不確認獨立估價就無法詢價；不明確核准付款就無法呼叫 paid tool。
 - **Kill switch**：在 `/admin/policy` 載入 policy，設為 `PAYMENT_PAUSED`；即使 Alice 核准，付款仍被 server-side policy 拒絕。展示後恢復 `ACTIVE`。
 - **支付邊界**：把單筆上限調低於 `CUSTOMS_BROKER_FEE_USDC`，展示 `PER_PAYMENT_LIMIT_EXCEEDED`。
@@ -240,7 +273,7 @@ Importer Agent 暴露四個 MCP tools：
    - 檢查必備文件與 DPP，產生進口商獨立估價及 `preflightId`。
    - DPP 至少 20% 經驗證減量才歸類為本 Demo policy 的低碳產品；低於門檻為 warning，無效 DPP 則阻擋傳送。
 3. `get_import_quote`
-   - 需要通過 preflight 且使用者明確確認估價，才把文件送給 broker。
+   - 需要通過 preflight、使用者明確確認估價並接受本訂單報關委任書，才把文件與附有 vLEI Authorization reference 的委任紀錄送給 broker。
    - 比對獨立估價、broker quote 與 compliance findings，回傳 `quoteId`，但不付款。
 4. `submit_import_declaration`
    - 需要相符、已審查且未過期的 quote，並重新檢查 compliance 與執行期付款政策。
@@ -296,10 +329,12 @@ pnpm --filter @luluguard/importer-mcp test
 Customs Broker 測試預設離線執行；opt-in live smoke test 需要有資金的 Base Sepolia 測試錢包：
 
 ```sh
-X402_LIVE_TEST=1 pnpm --filter @luluguard/customs-broker test
+X402_LIVE_TEST=1 node --env-file=.env --import tsx --test apps/customs-broker/test/live.test.ts
 ```
 
-測試涵蓋缺件與 DPP 錯誤阻擋、預估確認、報價效期、人工核准、支付限額、錯誤收款地址、並行重複付款、vLEI action／resource mismatch、過期與 nonce replay 等案例。測試中的 broker 與 paid fetch 是可重現的 stub；UI happy path 則使用環境變數指定的 broker API。
+一般 `pnpm test` 不會送出鏈上交易；live smoke test 只有在明確設定 `X402_LIVE_TEST=1` 且 wallet／address 格式有效時才會執行。
+
+測試涵蓋缺件與 DPP 錯誤、文件簽發者 LEI、報關委任同意、預估確認、報價效期、人工核准、支付限額、錯誤收款地址、並行重複付款、vLEI action／resource mismatch、過期、nonce replay、x402 challenge、settlement 與 ambiguous reconciliation。Importer 的 broker fetch 使用可重現 stub；customs broker 另有實際 HTTP middleware 測試，UI happy path 預設連到 repository 內建 broker。
 
 Production build 後，在不同 terminal 啟動：
 
@@ -312,13 +347,18 @@ pnpm --filter @luluguard/importer-mcp start
 pnpm --filter @luluguard/web start
 ```
 
+```sh
+pnpm --filter @luluguard/customs-broker start
+```
+
 ## 第三方套件、服務與素材揭露
 
 | 類別               | 套件／服務                                                                  | 用途與揭露                                                                                                                                   |
 | ------------------ | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | AI model           | `@google/genai` 或 `openai`                                                 | 依 `AI_PROVIDER` 擇一產生 Agent 回答與 tool calls；需要使用者自己的 API key，輸出可能非決定性                                                |
 | Agent protocol     | `@modelcontextprotocol/sdk`                                                 | Web 與 Importer／Verifier tools 之間的 MCP transport                                                                                         |
-| Payment            | `@x402/core`, `@x402/evm`, `@x402/fetch`, `viem`                            | x402 payment negotiation、EVM 簽章與 Base Sepolia 測試交易                                                                                   |
+| Payment            | `@x402/core`, `@x402/evm`, `@x402/express`, `@x402/fetch`, `viem`           | Importer buyer、broker resource server、x402 v2 `exact` challenge、EVM 簽章與 Base Sepolia 測試交易                                          |
+| Payment service    | 設定於 `X402_FACILITATOR_URL` 的 x402 Facilitator                           | 外部 verify／settle 服務；可用性、資料處理與服務條款由該 Facilitator 提供者負責                                                              |
 | Identity / signing | `vendor/vlei-sandbox`, `@noble/curves`                                      | sandbox vLEI／KERI-style JSON signing、驗章與曲線運算；`vlei-sandbox` 為 Git submodule，依其 [MIT License](vendor/vlei-sandbox/LICENSE) 使用 |
 | Managed key option | `@aws-sdk/client-kms`                                                       | 選用 AWS KMS 時的 signer backend；AWS 帳號與費用由執行者負擔                                                                                 |
 | Web / API          | Next.js、React、React Router、Express、Zod、TanStack Query                  | UI、HTTP service、schema validation 與 client state                                                                                          |
@@ -335,6 +375,6 @@ pnpm --filter @luluguard/web start
 - Policy、preflight、quote、nonce replay guard 與 payment history 主要在記憶體；production 必須使用 durable、具 concurrency control 的儲存。
 - 本機 JSONL 可偵測鏈內竄改，但不是 WORM storage；production 應外送 SIEM／immutable storage、簽署 checkpoint 並建立 retention policy。
 - `uploaded-files` 是本機 POC 儲存；production 必須加入物件儲存、加密、惡意檔案掃描、tenant isolation、資料保留與刪除流程。
-- 完整付款依賴外部 broker 的 x402 相容性及測試網可用性；Demo 前應做 end-to-end 預演並準備真實操作錄影作為網路故障備援。
+- Broker 已包含在 repository；完整付款仍依賴外部 x402 Facilitator、Base Sepolia RPC／網路及測試資產可用性。Demo 前應做 end-to-end 預演並準備真實操作錄影作為網路故障備援。
 - Customs quotes 與 declarations 是 mock 資料，不代表真實政府或報關整合；目前僅支援 Base Sepolia USDC 的 x402 v2 `exact` scheme。
 - Ambiguous settlement outcome 會 fail closed 並需要人工處理；replay protection、ownership lock 與 reconciliation 目前是 process-local。
