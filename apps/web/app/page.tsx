@@ -1,6 +1,7 @@
 "use client";
-import { FormEvent, useEffect, useState, type JSX } from "react";
+import { FormEvent, useEffect, useRef, useState, type JSX } from "react";
 import { DocumentUpload } from "./components/document-upload";
+import { MarkdownMessage } from "./components/markdown-message";
 import exampleOrders from "./example-orders.json";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -52,6 +53,8 @@ export default function Home(): JSX.Element {
   const [quoteId, setQuoteId] = useState<string>();
   const [lastAuthorization, setLastAuthorization] =
     useState<VleiAuthorizationSummary>();
+  const brokerStepRef = useRef<HTMLSpanElement>(null);
+  const brokerActionRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     void fetch("/api/auth/session")
@@ -62,6 +65,17 @@ export default function Home(): JSX.Element {
       })
       .finally(() => setSessionLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!readyForBroker || !preflightId || quoteId) return;
+
+    brokerStepRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+    brokerActionRef.current?.focus({ preventScroll: true });
+  }, [preflightId, quoteId, readyForBroker]);
 
   async function login(event: FormEvent) {
     event.preventDefault();
@@ -269,7 +283,10 @@ export default function Home(): JSX.Element {
             <span className={preflightId ? "done" : "active"}>
               1. AI 文件檢查與獨立估價
             </span>
-            <span className={quoteId ? "done" : readyForBroker ? "active" : ""}>
+            <span
+              ref={brokerStepRef}
+              className={quoteId ? "done" : readyForBroker ? "active" : ""}
+            >
               2. 確認後向報關行詢價
             </span>
             <span className={quoteId ? "active" : ""}>3. 明確核准後付款</span>
@@ -289,6 +306,7 @@ export default function Home(): JSX.Element {
             </button>
             {readyForBroker && preflightId && !quoteId && (
               <button
+                ref={brokerActionRef}
                 type="button"
                 className="secondary"
                 disabled={loading}
@@ -334,10 +352,21 @@ export default function Home(): JSX.Element {
               key={`${item.role}-${index}`}
             >
               <span>{item.role === "user" ? "你" : "進口商 AI"}</span>
-              <p>{item.content}</p>
+              {item.role === "assistant" ? (
+                <div className="message-content markdown">
+                  <MarkdownMessage content={item.content} />
+                </div>
+              ) : (
+                <p className="message-content">{item.content}</p>
+              )}
             </div>
           ))}
-          {loading && <div className="message assistant"><span>進口商 AI</span><p>{progress || "處理中…"}</p></div>}
+          {loading && (
+            <div className="message assistant">
+              <span>進口商 AI</span>
+              <p className="message-content">{progress || "處理中…"}</p>
+            </div>
+          )}
         </div>
         <form onSubmit={submit}>
           <label htmlFor="message">繼續對話或明確核准付款</label>
