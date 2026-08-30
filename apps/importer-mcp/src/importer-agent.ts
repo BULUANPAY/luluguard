@@ -1199,7 +1199,6 @@ export class ImporterAgent {
         body: JSON.stringify({
           quoteId,
           documents,
-          documentReview: reviewedQuote.documentReview,
         }),
       });
     } catch (error) {
