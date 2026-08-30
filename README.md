@@ -114,35 +114,9 @@ Policy, quote, payment-history, and reconciliation state is process-local and re
 
 ## Settlement reconciliation
 
-If a payment was dispatched but its terminal settlement cannot be proven, the Importer records an `ambiguous` or `pending` reconciliation and blocks automatic retry. Query it with the policy admin key:
+If a dispatched payment cannot be confirmed, the Importer records an `ambiguous` or `pending` reconciliation and blocks automatic retry. Use the policy-admin-protected `GET /admin/reconciliation/:quoteId` and `POST /admin/reconciliation/resolve` endpoints to inspect and resolve it.
 
-```sh
-curl \
-  -H "Authorization: Bearer $POLICY_ADMIN_API_KEY" \
-  http://127.0.0.1:4020/admin/reconciliation/QUOTE_ID
-```
-
-Only after an operator independently confirms a terminal failed settlement may the matching owner be released:
-
-```sh
-curl -X POST \
-  -H "Authorization: Bearer $POLICY_ADMIN_API_KEY" \
-  -H "Content-Type: application/json" \
-  http://127.0.0.1:4020/admin/reconciliation/resolve \
-  -d '{
-    "orderId": "ORDER_ID",
-    "quoteId": "QUOTE_ID",
-    "attemptId": "ATTEMPT_ID",
-    "settlement": {
-      "success": false,
-      "errorReason": "TERMINAL_FAILURE_REASON",
-      "transaction": "0xTRANSACTION_HASH",
-      "network": "eip155:84532"
-    }
-  }'
-```
-
-The API rejects successful settlements, `settlement_pending`, mismatched attempts, and wrong network, payer, or amount values. If the reconciliation record already contains a transaction hash, the terminal failure evidence must reference the same transaction. The API does not perform the external on-chain investigation for the operator.
+Only an operator-confirmed terminal failure can release the payment. Attempts, network, payer, amount, and any recorded transaction hash must match; the API does not perform the external on-chain investigation.
 
 ## Validation
 
@@ -155,35 +129,10 @@ pnpm test
 pnpm build
 ```
 
-Run service tests separately:
-
-```sh
-pnpm --filter @luluguard/customs-broker test
-pnpm --filter @luluguard/importer-mcp test
-```
-
 The Broker suite is offline by default. A funded Base Sepolia wallet is required for the opt-in live smoke test:
 
 ```sh
 X402_LIVE_TEST=1 pnpm --filter @luluguard/customs-broker test
-```
-
-Build and start production processes in separate terminals:
-
-```sh
-pnpm build
-```
-
-```sh
-pnpm --filter @luluguard/customs-broker start
-```
-
-```sh
-pnpm --filter @luluguard/importer-mcp start
-```
-
-```sh
-pnpm --filter @luluguard/web start
 ```
 
 ## Scope and limitations
