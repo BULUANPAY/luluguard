@@ -24,6 +24,9 @@ describe("export document helpers", () => {
     expect(document.invoice_number).toBe("");
     expect(document.issue_date).toBe("");
     expect(document.items[0]?.description).toBe("");
+    expect(document.items[0]?.model).toBe("");
+    expect(document.freight_usd).toBe(0);
+    expect(document.insurance_usd).toBe(0);
     expect(document.totals.total_amount).toBe(0);
   });
 
@@ -74,9 +77,12 @@ describe("export document helpers", () => {
       throw new Error("unexpected type");
     expect(document.invoice_number).toBe("INV-DEMO-20260829-001");
     expect(document.items[0]?.description).toBe("Unicorn");
+    expect(document.items[0]?.model).toBe("Equus unicornis scoticus");
     expect(document.items[0]?.quantity).toBe(10000);
     expect(document.items[0]?.unit).toBe("HEAD");
     expect(document.totals.total_quantity).toBe(10000);
+    expect(document.freight_usd).toBeGreaterThan(0);
+    expect(document.insurance_usd).toBeGreaterThan(0);
     expect(document.totals.total_amount).toBe(
       document.items[0]!.quantity * document.items[0]!.unit_price,
     );
@@ -115,6 +121,7 @@ describe("export document helpers", () => {
       throw new Error("unexpected type");
     expect(document.dpp_id).toBe("DPP-UNICORN-SCO-20260829-001");
     expect(document.product.batch_id).toBe(document.dpp_id);
+    expect(document.product.model).toBe("Equus unicornis scoticus");
     expect(document.product.quantity).toBe(10000);
     expect(document.product.unit).toBe("HEAD");
     expect(document.carbon_footprint.reduction_percent).toBe(28);

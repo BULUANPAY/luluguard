@@ -56,10 +56,13 @@ export interface CommercialInvoice extends ExportDocumentBase {
   document_type: "COMMERCIAL_INVOICE";
   invoice_number: string;
   currency: "USD" | "GBP";
+  freight_usd: number;
+  insurance_usd: number;
   shipment: ShipmentDetails & { incoterm: string };
   items: Array<{
     line_no: number;
     description: string;
+    model: string;
     hs_code: string;
     quantity: number;
     unit: string;
@@ -188,6 +191,8 @@ const invoiceSchema = documentBaseSchema.extend({
   document_type: z.literal("COMMERCIAL_INVOICE"),
   invoice_number: z.string(),
   currency: z.enum(["USD", "GBP"]),
+  freight_usd: z.number().nonnegative(),
+  insurance_usd: z.number().nonnegative(),
   shipment: shipmentSchema.extend({ incoterm: z.string() }),
   items: z
     .array(
@@ -195,6 +200,7 @@ const invoiceSchema = documentBaseSchema.extend({
         .object({
           line_no: z.number().finite(),
           description: z.string(),
+          model: z.string(),
           hs_code: z.string(),
           quantity: z.number().finite(),
           unit: z.string().trim().min(1),
@@ -342,11 +348,14 @@ export function createEmptyExportDocument(
       document_type: "COMMERCIAL_INVOICE",
       invoice_number: "",
       currency: "USD",
+      freight_usd: 0,
+      insurance_usd: 0,
       shipment: { ...common.shipment, incoterm: "" },
       items: [
         {
           line_no: 1,
           description: "",
+          model: "",
           hs_code: "",
           quantity: 0,
           unit: "",
@@ -475,11 +484,14 @@ export function createTestExportDocument(
       document_type: "COMMERCIAL_INVOICE",
       invoice_number: DEMO_INVOICE_NUMBER,
       currency: "USD",
+      freight_usd: isUfo ? 1_500_000 : 2_400_000,
+      insurance_usd: isUfo ? 625_000 : 850_000,
       shipment: { ...common.shipment, incoterm: "CIF Kaohsiung" },
       items: [
         {
           line_no: 1,
           description: isUfo ? "Unidentified Flying Object" : "Unicorn",
+          model: isUfo ? "UFO-X50" : "Equus unicornis scoticus",
           hs_code: isUfo ? "8806.29" : "0101.21",
           quantity: isUfo ? 50 : 10000,
           unit: isUfo ? "UNIT" : "HEAD",

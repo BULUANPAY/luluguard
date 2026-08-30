@@ -172,6 +172,20 @@ function InvoiceFields({
           options={["USD", "GBP"]}
           value={document.currency}
         />
+        <NumberField
+          label="運費（USD）"
+          onChange={(value) =>
+            updateInvoice(update, (draft) => (draft.freight_usd = value))
+          }
+          value={document.freight_usd}
+        />
+        <NumberField
+          label="保險費（USD）"
+          onChange={(value) =>
+            updateInvoice(update, (draft) => (draft.insurance_usd = value))
+          }
+          value={document.insurance_usd}
+        />
         <NumberField label="項次" readOnly value={item.line_no} />
         <TextField
           label="品名"
@@ -179,6 +193,13 @@ function InvoiceFields({
             updateInvoiceItem(update, (draft) => (draft.description = value))
           }
           value={item.description}
+        />
+        <TextField
+          label="產品型號"
+          onChange={(value) =>
+            updateInvoiceItem(update, (draft) => (draft.model = value))
+          }
+          value={item.model}
         />
         <TextField
           label="HS Code"
