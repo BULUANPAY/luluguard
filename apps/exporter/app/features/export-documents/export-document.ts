@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export type ExportDocumentType =
   "COMMERCIAL_INVOICE" | "PACKING_LIST" | "DIGITAL_PRODUCT_PASSPORT";
+export type TestDataSet = "UNICORN" | "UFO";
 
 export interface Party {
   name: string;
@@ -58,10 +59,9 @@ export interface CommercialInvoice extends ExportDocumentBase {
   items: Array<{
     line_no: number;
     description: string;
-    scientific_name: string;
     hs_code: string;
     quantity: number;
-    unit: "HEAD";
+    unit: string;
     unit_price: number;
     amount: number;
     dpp_batch_id: string;
@@ -79,16 +79,15 @@ export interface PackingList extends ExportDocumentBase {
   packages: {
     package_type: string;
     total_packages: number;
-    heads_per_package: number;
+    quantity_per_package: number;
     total_quantity: number;
-    unit: "HEAD";
+    unit: string;
   };
   cargo: Array<{
     line_no: number;
     description: string;
-    scientific_name: string;
     quantity: number;
-    unit: "HEAD";
+    unit: string;
     dpp_batch_id: string;
   }>;
   weight: {
@@ -110,7 +109,7 @@ export interface DigitalProductPassport extends ExportDocumentBase {
     hs_code: string;
     batch_id: string;
     quantity: number;
-    unit: "HEAD";
+    unit: string;
   };
   carbon_footprint: {
     product_carbon_footprint_kg_co2e: number;
@@ -194,10 +193,9 @@ const invoiceSchema = documentBaseSchema.extend({
         .object({
           line_no: z.number().finite(),
           description: z.string(),
-          scientific_name: z.string(),
           hs_code: z.string(),
           quantity: z.number().finite(),
-          unit: z.literal("HEAD"),
+          unit: z.string().trim().min(1),
           unit_price: z.number().finite(),
           amount: z.number().finite(),
           dpp_batch_id: z.string(),
@@ -220,9 +218,9 @@ const packingListSchema = documentBaseSchema.extend({
     .object({
       package_type: z.string(),
       total_packages: z.number().finite(),
-      heads_per_package: z.number().finite(),
+      quantity_per_package: z.number().finite(),
       total_quantity: z.number().finite(),
-      unit: z.literal("HEAD"),
+      unit: z.string().trim().min(1),
     })
     .passthrough(),
   cargo: z
@@ -231,9 +229,8 @@ const packingListSchema = documentBaseSchema.extend({
         .object({
           line_no: z.number().finite(),
           description: z.string(),
-          scientific_name: z.string(),
           quantity: z.number().finite(),
-          unit: z.literal("HEAD"),
+          unit: z.string().trim().min(1),
           dpp_batch_id: z.string(),
         })
         .passthrough(),
@@ -259,7 +256,7 @@ const digitalProductPassportSchema = documentBaseSchema.extend({
       hs_code: z.string().trim().min(1),
       batch_id: z.string().trim().min(1),
       quantity: z.number().positive(),
-      unit: z.literal("HEAD"),
+      unit: z.string().trim().min(1),
     })
     .passthrough(),
   carbon_footprint: z
@@ -345,10 +342,9 @@ export function createEmptyExportDocument(
         {
           line_no: 1,
           description: "",
-          scientific_name: "",
           hs_code: "",
           quantity: 0,
-          unit: "HEAD",
+          unit: "",
           unit_price: 0,
           amount: 0,
           dpp_batch_id: "",
@@ -373,7 +369,7 @@ export function createEmptyExportDocument(
         hs_code: "",
         batch_id: "",
         quantity: 0,
-        unit: "HEAD",
+        unit: "",
       },
       carbon_footprint: {
         product_carbon_footprint_kg_co2e: 0,
@@ -396,17 +392,16 @@ export function createEmptyExportDocument(
     packages: {
       package_type: "",
       total_packages: 0,
-      heads_per_package: 0,
+      quantity_per_package: 0,
       total_quantity: 0,
-      unit: "HEAD",
+      unit: "",
     },
     cargo: [
       {
         line_no: 1,
         description: "",
-        scientific_name: "",
         quantity: 0,
-        unit: "HEAD",
+        unit: "",
         dpp_batch_id: "",
       },
     ],
@@ -424,7 +419,9 @@ export function createEmptyExportDocument(
 export function createTestExportDocument(
   documentType: ExportDocumentType,
   exporterName: string,
+  dataSet: TestDataSet = "UNICORN",
 ): ExportDocument {
+  const isUfo = dataSet === "UFO";
   const common = {
     document_id: crypto.randomUUID(),
     issue_date: "2026-08-29",
@@ -436,10 +433,14 @@ export function createTestExportDocument(
       vlei: "LEI-DEMO-SCOTTISH-UNICORN-EXPORTS-001",
     },
     importer: {
-      name: "Formosa Unicorn Imports Co., Ltd.",
+      name: isUfo
+        ? "Formosa Aerospace Research Co., Ltd."
+        : "Formosa Unicorn Imports Co., Ltd.",
       country: "Taiwan",
       address: "No. 100, Harbor Road, Kaohsiung, Taiwan",
-      vlei: "LEI-DEMO-FORMOSA-UNICORN-IMPORTS-001",
+      vlei: isUfo
+        ? "LEI-DEMO-FORMOSA-AEROSPACE-IMPORTS-001"
+        : "LEI-DEMO-FORMOSA-UNICORN-IMPORTS-001",
     },
     shipment: {
       country_of_origin: "United Kingdom",
@@ -447,7 +448,7 @@ export function createTestExportDocument(
       country_of_export: "United Kingdom",
       destination: "Port of Kaohsiung, Taiwan",
       transport_mode: "SEA" as const,
-      vessel: "MV Highland Rainbow",
+      vessel: isUfo ? "MV Celestial Voyager" : "MV Highland Rainbow",
     },
     issuer: {
       organization: exporterName,
@@ -472,19 +473,20 @@ export function createTestExportDocument(
       items: [
         {
           line_no: 1,
-          description: "Unicorn",
-          scientific_name: "Equus unicornis scoticus",
-          hs_code: "0101.21",
-          quantity: 10000,
-          unit: "HEAD",
-          unit_price: 5000,
-          amount: 50000000,
-          dpp_batch_id: "DPP-UNICORN-SCO-20260829-001",
+          description: isUfo ? "Unidentified Flying Object" : "Unicorn",
+          hs_code: isUfo ? "8806.29" : "0101.21",
+          quantity: isUfo ? 50 : 10000,
+          unit: isUfo ? "UNIT" : "HEAD",
+          unit_price: isUfo ? 2500000 : 5000,
+          amount: isUfo ? 125000000 : 50000000,
+          dpp_batch_id: isUfo
+            ? "DPP-UFO-SCO-20260829-001"
+            : "DPP-UNICORN-SCO-20260829-001",
         },
       ],
       totals: {
-        total_quantity: 10000,
-        total_amount: 50000000,
+        total_quantity: isUfo ? 50 : 10000,
+        total_amount: isUfo ? 125000000 : 50000000,
         currency: "USD",
       },
     };
@@ -494,14 +496,18 @@ export function createTestExportDocument(
     return {
       ...common,
       document_type: "DIGITAL_PRODUCT_PASSPORT",
-      dpp_id: "DPP-UNICORN-SCO-20260829-001",
+      dpp_id: isUfo
+        ? "DPP-UFO-SCO-20260829-001"
+        : "DPP-UNICORN-SCO-20260829-001",
       product: {
-        name: "Unicorn",
-        model: "Equus unicornis scoticus",
-        hs_code: "0101.21",
-        batch_id: "DPP-UNICORN-SCO-20260829-001",
-        quantity: 10000,
-        unit: "HEAD",
+        name: isUfo ? "Unidentified Flying Object" : "Unicorn",
+        model: isUfo ? "UFO-X50" : "Equus unicornis scoticus",
+        hs_code: isUfo ? "8806.29" : "0101.21",
+        batch_id: isUfo
+          ? "DPP-UFO-SCO-20260829-001"
+          : "DPP-UNICORN-SCO-20260829-001",
+        quantity: isUfo ? 50 : 10000,
+        unit: isUfo ? "UNIT" : "HEAD",
       },
       carbon_footprint: {
         product_carbon_footprint_kg_co2e: 360,
@@ -523,31 +529,38 @@ export function createTestExportDocument(
   return {
     ...common,
     document_type: "PACKING_LIST",
-    related_invoice: "INV-UNI-20260829-001",
+    related_invoice: isUfo
+      ? "INV-UFO-20260829-001"
+      : "INV-UNI-20260829-001",
     packages: {
-      package_type: "Magical Livestock Transport Container",
-      total_packages: 1000,
-      heads_per_package: 10,
-      total_quantity: 10000,
-      unit: "HEAD",
+      package_type: isUfo
+        ? "Anti-gravity Transport Cradle"
+        : "Magical Livestock Transport Container",
+      total_packages: isUfo ? 10 : 1000,
+      quantity_per_package: isUfo ? 5 : 10,
+      total_quantity: isUfo ? 50 : 10000,
+      unit: isUfo ? "UNIT" : "HEAD",
     },
     cargo: [
       {
         line_no: 1,
-        description: "Unicorn",
-        scientific_name: "Equus unicornis scoticus",
-        quantity: 10000,
-        unit: "HEAD",
-        dpp_batch_id: "DPP-UNICORN-SCO-20260829-001",
+        description: isUfo ? "Unidentified Flying Object" : "Unicorn",
+        quantity: isUfo ? 50 : 10000,
+        unit: isUfo ? "UNIT" : "HEAD",
+        dpp_batch_id: isUfo
+          ? "DPP-UFO-SCO-20260829-001"
+          : "DPP-UNICORN-SCO-20260829-001",
       },
     ],
     weight: {
-      net_weight_kg: 4200000,
-      gross_weight_kg: 5000000,
+      net_weight_kg: isUfo ? 750000 : 4200000,
+      gross_weight_kg: isUfo ? 800000 : 5000000,
     },
     marks_and_numbers: {
-      mark: "SCOTTISH UNICORN EXPORT",
-      range: "LOT-00001 ~ LOT-10000",
+      mark: isUfo
+        ? "CELESTIAL CARGO — HANDLE WITH CARE"
+        : "SCOTTISH UNICORN EXPORT",
+      range: isUfo ? "UFO-001 ~ UFO-050" : "LOT-00001 ~ LOT-10000",
     },
   };
 }

@@ -1,13 +1,14 @@
 import { Button } from "@luluguard/ui/components/button";
 import { Input } from "@luluguard/ui/components/input";
 import { Database, Send } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import type {
   ExportDocument,
   IssuerDetails,
   Party,
   ShipmentDetails,
+  TestDataSet,
 } from "./export-document";
 
 type UpdateDocument = (mutate: (draft: ExportDocument) => void) => void;
@@ -25,8 +26,9 @@ export function ExportDocumentEditor({
   isSubmitting: boolean;
   onChange: (document: ExportDocument) => void;
   onSubmit: () => void;
-  onUseTestData: () => void;
+  onUseTestData: (dataSet: TestDataSet) => void;
 }) {
+  const [testDataSet, setTestDataSet] = useState<TestDataSet>("UNICORN");
   const update: UpdateDocument = (mutate) => {
     const nextDocument = structuredClone(document);
     mutate(nextDocument);
@@ -48,15 +50,24 @@ export function ExportDocumentEditor({
             修改欄位時，右側 JSON 會立即同步。
           </p>
         </div>
-        <Button
-          disabled={isSubmitting}
-          onClick={onUseTestData}
-          type="button"
-          variant="outline"
-        >
-          <Database className="size-4" />
-          使用測試資料
-        </Button>
+        <div className="flex flex-wrap items-end gap-2">
+          <SelectField
+            label="測試資料"
+            onChange={(value) => setTestDataSet(value as TestDataSet)}
+            options={["UNICORN", "UFO"]}
+            optionLabels={{ UNICORN: "獨角獸 10,000 頭", UFO: "飛碟 50 台" }}
+            value={testDataSet}
+          />
+          <Button
+            disabled={isSubmitting}
+            onClick={() => onUseTestData(testDataSet)}
+            type="button"
+            variant="outline"
+          >
+            <Database className="size-4" />
+            帶入測試資料
+          </Button>
+        </div>
       </div>
 
       <Section title="文件資訊">
@@ -162,16 +173,6 @@ function InvoiceFields({
           value={item.description}
         />
         <TextField
-          label="學名"
-          onChange={(value) =>
-            updateInvoiceItem(
-              update,
-              (draft) => (draft.scientific_name = value),
-            )
-          }
-          value={item.scientific_name}
-        />
-        <TextField
           label="HS Code"
           onChange={(value) =>
             updateInvoiceItem(update, (draft) => (draft.hs_code = value))
@@ -185,7 +186,15 @@ function InvoiceFields({
           }
           value={item.quantity}
         />
-        <FixedValue label="單位" value={item.unit} />
+        <TextField
+          label="單位"
+          onChange={(value) =>
+            updateInvoiceItem(update, (draft) => (draft.unit = value))
+          }
+          placeholder="例如：PCS、KG、BOX"
+          required
+          value={item.unit}
+        />
         <NumberField
           label="單價"
           onChange={(value) =>
@@ -281,10 +290,10 @@ function PackingListFields({
           onChange={(value) =>
             updatePackingList(
               update,
-              (draft) => (draft.packages.heads_per_package = value),
+              (draft) => (draft.packages.quantity_per_package = value),
             )
           }
-          value={document.packages.heads_per_package}
+          value={document.packages.quantity_per_package}
         />
         <NumberField
           label="總數量"
@@ -296,7 +305,15 @@ function PackingListFields({
           }
           value={document.packages.total_quantity}
         />
-        <FixedValue label="單位" value={document.packages.unit} />
+        <TextField
+          label="單位"
+          onChange={(value) =>
+            updatePackingList(update, (draft) => (draft.packages.unit = value))
+          }
+          placeholder="例如：PCS、KG、BOX"
+          required
+          value={document.packages.unit}
+        />
       </Section>
       <Section title="貨物內容">
         <NumberField label="項次" readOnly value={cargo.line_no} />
@@ -307,16 +324,6 @@ function PackingListFields({
           }
           value={cargo.description}
         />
-        <TextField
-          label="學名"
-          onChange={(value) =>
-            updatePackingCargo(
-              update,
-              (draft) => (draft.scientific_name = value),
-            )
-          }
-          value={cargo.scientific_name}
-        />
         <NumberField
           label="數量"
           onChange={(value) =>
@@ -324,7 +331,15 @@ function PackingListFields({
           }
           value={cargo.quantity}
         />
-        <FixedValue label="單位" value={cargo.unit} />
+        <TextField
+          label="單位"
+          onChange={(value) =>
+            updatePackingCargo(update, (draft) => (draft.unit = value))
+          }
+          placeholder="例如：PCS、KG、BOX"
+          required
+          value={cargo.unit}
+        />
         <TextField
           label="DPP Batch ID"
           onChange={(value) =>
@@ -410,7 +425,7 @@ function DigitalProductPassportFields({
           value={document.product.name}
         />
         <TextField
-          label="產品型號／學名"
+          label="產品型號"
           onChange={(value) =>
             updateDppProduct(update, (draft) => (draft.model = value))
           }
@@ -437,7 +452,15 @@ function DigitalProductPassportFields({
           }
           value={document.product.quantity}
         />
-        <FixedValue label="單位" value={document.product.unit} />
+        <TextField
+          label="單位"
+          onChange={(value) =>
+            updateDppProduct(update, (draft) => (draft.unit = value))
+          }
+          placeholder="例如：PCS、KG、BOX"
+          required
+          value={document.product.unit}
+        />
       </Section>
       <Section title="產品碳足跡與第三方查證">
         <NumberField
@@ -753,11 +776,13 @@ function NumberField({
 function SelectField({
   label,
   onChange,
+  optionLabels,
   options,
   value,
 }: {
   label: string;
   onChange: (value: string) => void;
+  optionLabels?: Record<string, string>;
   options: string[];
   value: string;
 }) {
@@ -771,7 +796,7 @@ function SelectField({
       >
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {optionLabels?.[option] ?? option}
           </option>
         ))}
       </select>

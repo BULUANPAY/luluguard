@@ -40,6 +40,7 @@ describe("export document helpers", () => {
     expect(document.importer.country).toBe("Taiwan");
     expect(document.cargo[0]?.description).toBe("Unicorn");
     expect(document.cargo[0]?.quantity).toBe(10000);
+    expect(document.cargo[0]?.unit).toBe("HEAD");
     expect(document.packages.total_quantity).toBe(document.cargo[0]?.quantity);
     expect(document.weight.gross_weight_kg).toBeGreaterThan(
       document.weight.net_weight_kg,
@@ -72,6 +73,7 @@ describe("export document helpers", () => {
       throw new Error("unexpected type");
     expect(document.items[0]?.description).toBe("Unicorn");
     expect(document.items[0]?.quantity).toBe(10000);
+    expect(document.items[0]?.unit).toBe("HEAD");
     expect(document.totals.total_quantity).toBe(10000);
     expect(document.totals.total_amount).toBe(
       document.items[0]!.quantity * document.items[0]!.unit_price,
@@ -89,10 +91,43 @@ describe("export document helpers", () => {
     expect(document.dpp_id).toBe("DPP-UNICORN-SCO-20260829-001");
     expect(document.product.batch_id).toBe(document.dpp_id);
     expect(document.product.quantity).toBe(10000);
+    expect(document.product.unit).toBe("HEAD");
     expect(document.carbon_footprint.reduction_percent).toBe(28);
     expect(document.carbon_footprint.product_carbon_footprint_kg_co2e).toBe(
       document.carbon_footprint.baseline_kg_co2e * 0.72,
     );
+    expect(parseExportDocument(JSON.stringify(document))).toEqual(document);
+  });
+
+  it.each([
+    "COMMERCIAL_INVOICE",
+    "PACKING_LIST",
+    "DIGITAL_PRODUCT_PASSPORT",
+  ] as const)("loads 50 UFOs for %s", (documentType) => {
+    const document = createTestExportDocument(
+      documentType,
+      "Sinclair Livestock Exports Ltd.",
+      "UFO",
+    );
+
+    if (document.document_type === "COMMERCIAL_INVOICE") {
+      expect(document.items[0]?.description).toBe(
+        "Unidentified Flying Object",
+      );
+      expect(document.items[0]?.quantity).toBe(50);
+      expect(document.items[0]?.unit).toBe("UNIT");
+    } else if (document.document_type === "PACKING_LIST") {
+      expect(document.cargo[0]?.description).toBe(
+        "Unidentified Flying Object",
+      );
+      expect(document.cargo[0]?.quantity).toBe(50);
+      expect(document.packages.quantity_per_package).toBe(5);
+    } else {
+      expect(document.product.name).toBe("Unidentified Flying Object");
+      expect(document.product.quantity).toBe(50);
+      expect(document.product.unit).toBe("UNIT");
+    }
+
     expect(parseExportDocument(JSON.stringify(document))).toEqual(document);
   });
 

@@ -182,9 +182,13 @@ function ExportDocumentWorkspace({
                 setEnvelope(undefined);
               }}
               onSubmit={() => setIsSignDialogOpen(true)}
-              onUseTestData={() => {
+              onUseTestData={(dataSet) => {
                 setDocument(
-                  createTestExportDocument(documentType, exporterCompany),
+                  createTestExportDocument(
+                    documentType,
+                    exporterCompany,
+                    dataSet,
+                  ),
                 );
                 setSubmitState("idle");
                 setError(undefined);
