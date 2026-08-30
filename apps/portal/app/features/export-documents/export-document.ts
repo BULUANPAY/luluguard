@@ -426,6 +426,7 @@ export function createTestExportDocument(
   exporterName: string,
 ): ExportDocument {
   const common = {
+    document_id: crypto.randomUUID(),
     issue_date: "2026-08-29",
     exporter: {
       name: exporterName,
@@ -466,7 +467,6 @@ export function createTestExportDocument(
     return {
       ...common,
       document_type: "COMMERCIAL_INVOICE",
-      document_id: "INV-UNI-20260829-001",
       currency: "USD",
       shipment: { ...common.shipment, incoterm: "CIF Kaohsiung" },
       items: [
@@ -494,7 +494,6 @@ export function createTestExportDocument(
     return {
       ...common,
       document_type: "DIGITAL_PRODUCT_PASSPORT",
-      document_id: "DPP-UNI-20260829-001",
       dpp_id: "DPP-UNICORN-SCO-20260829-001",
       product: {
         name: "Unicorn",
@@ -524,7 +523,6 @@ export function createTestExportDocument(
   return {
     ...common,
     document_type: "PACKING_LIST",
-    document_id: "PL-UNI-20260829-001",
     related_invoice: "INV-UNI-20260829-001",
     packages: {
       package_type: "Magical Livestock Transport Container",

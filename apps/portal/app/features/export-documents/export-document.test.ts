@@ -46,6 +46,22 @@ describe("export document helpers", () => {
     );
   });
 
+  it("generates a unique UUID document number for each test data set", () => {
+    const first = createTestExportDocument(
+      "COMMERCIAL_INVOICE",
+      "Sinclair Livestock Exports Ltd.",
+    );
+    const second = createTestExportDocument(
+      "COMMERCIAL_INVOICE",
+      "Sinclair Livestock Exports Ltd.",
+    );
+
+    expect(first.document_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(second.document_id).not.toBe(first.document_id);
+  });
+
   it("loads the same 10,000 Scottish unicorns in the invoice", () => {
     const document = createTestExportDocument(
       "COMMERCIAL_INVOICE",
