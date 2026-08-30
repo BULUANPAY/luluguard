@@ -3,15 +3,13 @@ import type { SignedExportDocumentEnvelope } from "./signing-client";
 export function buildSignedResponseFileName(
   envelope: SignedExportDocumentEnvelope,
 ) {
-  const organization = sanitizeFileNamePart(
-    envelope.payload.issuer.organization,
-    "exporter",
+  const documentType = envelope.payload.document_type;
+  const documentId = sanitizeFileNamePart(
+    envelope.payload.document_id,
+    "unnumbered",
   );
-  const documentType =
-    envelope.payload.document_type === "COMMERCIAL_INVOICE" ? "I-V" : "P-L";
-  const date = sanitizeFileNamePart(envelope.payload.issue_date, "undated");
 
-  return `${organization}_${documentType}_${date}.json`;
+  return `${documentType}_${documentId}.json`;
 }
 
 export function downloadSignedResponse(envelope: SignedExportDocumentEnvelope) {
