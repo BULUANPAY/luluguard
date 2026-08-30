@@ -117,7 +117,7 @@ pnpm --filter @luluguard/importer-mcp dev
 pnpm --filter @luluguard/web dev
 ```
 
-For the trade portal's I/V and P/L generator, start these in separate terminals:
+For the trade portal's I/V, P/L, and DPP generators, start these in separate terminals:
 
 ```sh
 pnpm dev:vlei-signing-api
@@ -149,7 +149,9 @@ The agent exposes four MCP tools. The read-only file tool is available throughou
    - Reads uploaded JSON files for an order from `uploaded-files/<order-id>/<document-type>/`.
    - Supports both built-in and custom document types without contacting the broker or making a payment.
 2. `review_import_documents`
-   - Reviews the mock documents selected in the Web UI.
+   - Reviews the uploaded documents, including the required exporter-provided DPP.
+   - Validates DPP product/batch matching, carbon-footprint arithmetic, third-party verification metadata, and validity dates.
+   - Classifies products with at least 20% verified reduction as low-carbon under the importer demo policy; a lower result is reported as a warning, while an invalid DPP blocks transmission.
    - Produces an independent importer estimate and a `preflightId`.
    - Does not contact the customs broker and does not pay.
 3. `get_import_quote`
@@ -161,7 +163,7 @@ The agent exposes four MCP tools. The read-only file tool is available throughou
    - Requires a matching reviewed quote that has not expired.
    - Rechecks compliance findings and runtime payment policy.
    - Requires human approval above the configured threshold.
-   - Uses x402 to pay the broker and submit the declaration.
+   - Uses x402 to pay the broker and submits both the DPP and the low-carbon assessment with the declaration.
 
 Payment can be blocked by agent status, payee allowlist, per-payment limit, rolling 24-hour limit, hourly payment count, missing human approval, an expired quote, or a compliance blocker.
 

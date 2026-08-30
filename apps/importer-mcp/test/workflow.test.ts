@@ -265,8 +265,71 @@ test("missing required documents are blocked before broker transmission", async 
   assert.equal(brokerCalled, false);
   assert.deepEqual(result.documentReview.missingRequiredDocuments.sort(), [
     "bill_of_lading",
+    "digital_product_passport",
     "packing_list",
   ]);
+});
+
+test("validates DPP and classifies the product as low carbon before transmission", () => {
+  const result = createAgent().precheck(
+    "TEST-DPP",
+    getMockExportDocuments("TEST-DPP"),
+  );
+
+  assert.equal(result.readyForBroker, true);
+  assert.equal(result.documentReview.lowCarbonAssessment.documentValid, true);
+  assert.equal(
+    result.documentReview.lowCarbonAssessment.qualifiesAsLowCarbonProduct,
+    true,
+  );
+  assert.equal(
+    result.documentReview.lowCarbonAssessment.calculatedReductionPercent,
+    28,
+  );
+});
+
+test("blocks an inconsistent DPP before customs transmission", () => {
+  let brokerCalled = false;
+  const documents = getMockExportDocuments("TEST-DPP-MISMATCH");
+  documents.digitalProductPassport!.carbonFootprint.claimedReductionPercent = 40;
+  const result = createAgent(
+    undefined,
+    undefined,
+    freeQuoteFetch(() => {
+      brokerCalled = true;
+    }),
+  ).precheck("TEST-DPP-MISMATCH", documents);
+
+  assert.equal(result.readyForBroker, false);
+  assert.equal(brokerCalled, false);
+  assert.ok(
+    result.documentReview.findings.some(
+      (finding) => finding.code === "DPP_CARBON_REDUCTION_MISMATCH",
+    ),
+  );
+});
+
+test("submits the validated DPP and low-carbon decision at customs filing", async () => {
+  let submittedBody: unknown;
+  const paidFetch: typeof globalThis.fetch = async (_input, init) => {
+    submittedBody = JSON.parse(String(init?.body));
+    return fakePaidFetch()("http://broker.test");
+  };
+  const agent = createAgent(undefined, paidFetch);
+  await precheckAndQuote(agent, "TEST-DPP-SUBMIT");
+  await agent.submit("TEST-DPP-SUBMIT", quoteId, true);
+
+  const body = submittedBody as {
+    documents: ReturnType<typeof getMockExportDocuments>;
+    documentReview: {
+      lowCarbonAssessment: { qualifiesAsLowCarbonProduct: boolean };
+    };
+  };
+  assert.ok(body.documents.digitalProductPassport);
+  assert.equal(
+    body.documentReview.lowCarbonAssessment.qualifiesAsLowCarbonProduct,
+    true,
+  );
 });
 
 test("invalid invoice and packing values are blocked before broker transmission", async () => {

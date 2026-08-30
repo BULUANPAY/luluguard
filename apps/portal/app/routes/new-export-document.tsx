@@ -121,8 +121,8 @@ function ExportDocumentWorkspace({
             產生出口文件
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            在左側填寫固定格式的 I/V 或 P/L，右側會即時產生 JSON，確認後可送至
-            vLEI JSON signing API。
+            在左側填寫固定格式的 I/V、P/L 或 DPP，右側會即時產生
+            JSON，確認後可送至 vLEI JSON signing API。
           </p>
         </div>
       </section>
@@ -141,6 +141,11 @@ function ExportDocumentWorkspace({
           label="P/L 裝箱單"
           onClick={() => switchDocumentType("PACKING_LIST")}
         />
+        <DocumentTypeButton
+          active={documentType === "DIGITAL_PRODUCT_PASSPORT"}
+          label="DPP 數位產品護照"
+          onClick={() => switchDocumentType("DIGITAL_PRODUCT_PASSPORT")}
+        />
       </div>
 
       <div className="grid items-start gap-5 xl:grid-cols-2">
@@ -149,7 +154,9 @@ function ExportDocumentWorkspace({
             <CardTitle>
               {documentType === "COMMERCIAL_INVOICE"
                 ? "I/V 商業發票"
-                : "P/L 裝箱單"}
+                : documentType === "PACKING_LIST"
+                  ? "P/L 裝箱單"
+                  : "DPP 數位產品護照"}
             </CardTitle>
             <CardDescription>
               依固定欄位填寫文件內容，也可載入一組固定測試資料。
@@ -246,7 +253,9 @@ function ExportDocumentWorkspace({
             fileName={
               documentType === "COMMERCIAL_INVOICE"
                 ? "commercial-invoice.json"
-                : "packing-list.json"
+                : documentType === "PACKING_LIST"
+                  ? "packing-list.json"
+                  : "digital-product-passport.json"
             }
             payload={document}
           />
@@ -300,7 +309,7 @@ function ExporterOnly() {
           此功能僅供出口商使用
         </h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          請先從右上角公司選單切換到出口商，再產生 I/V 或 P/L 文件。
+          請先從右上角公司選單切換到出口商，再產生 I/V、P/L 或 DPP 文件。
         </p>
         <Link
           className="mt-5 inline-flex text-sm font-semibold text-primary hover:underline"

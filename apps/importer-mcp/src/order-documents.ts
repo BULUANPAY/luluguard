@@ -1,4 +1,8 @@
-import type { ExportDocuments, TradeDocumentType, TradeItem } from "./domain.js";
+import type {
+  ExportDocuments,
+  TradeDocumentType,
+  TradeItem,
+} from "./domain.js";
 import { getOrderFiles, type OrderFile } from "./order-files.js";
 
 const knownDocumentTypes: readonly TradeDocumentType[] = [
@@ -7,20 +11,24 @@ const knownDocumentTypes: readonly TradeDocumentType[] = [
   "bill_of_lading",
   "certificate_of_origin",
   "product_specification",
-  "import_permit"
+  "digital_product_passport",
+  "import_permit",
 ];
 
 function isKnownDocumentType(value: string): value is TradeDocumentType {
   return (knownDocumentTypes as readonly string[]).includes(value);
 }
 
-function firstFileOfType(files: OrderFile[], type: TradeDocumentType): OrderFile | undefined {
-  return files.find(file => file.documentType === type);
+function firstFileOfType(
+  files: OrderFile[],
+  type: TradeDocumentType,
+): OrderFile | undefined {
+  return files.find((file) => file.documentType === type);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : undefined;
 }
 
@@ -29,11 +37,15 @@ function asString(value: unknown): string | undefined {
 }
 
 function asNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 function asIncoterm(value: unknown): ExportDocuments["incoterm"] {
-  return value === "EXW" || value === "FOB" || value === "CIF" ? value : undefined;
+  return value === "EXW" || value === "FOB" || value === "CIF"
+    ? value
+    : undefined;
 }
 
 function asItems(value: unknown): TradeItem[] {
@@ -47,10 +59,27 @@ function asItems(value: unknown): TradeItem[] {
     const intendedUse = asString(record.intendedUse);
     const quantity = asNumber(record.quantity);
     const unitPriceUsd = asNumber(record.unitPriceUsd);
-    if (!description || !model || !material || !intendedUse || quantity === undefined || unitPriceUsd === undefined)
+    if (
+      !description ||
+      !model ||
+      !material ||
+      !intendedUse ||
+      quantity === undefined ||
+      unitPriceUsd === undefined
+    )
       return [];
     const hsCode = asString(record.hsCode);
-    return [{ description, model, material, intendedUse, quantity, unitPriceUsd, ...(hsCode ? { hsCode } : {}) }];
+    return [
+      {
+        description,
+        model,
+        material,
+        intendedUse,
+        quantity,
+        unitPriceUsd,
+        ...(hsCode ? { hsCode } : {}),
+      },
+    ];
   });
 }
 
@@ -63,16 +92,26 @@ function asItems(value: unknown): TradeItem[] {
  */
 export async function buildExportDocumentsFromUploads(
   storageRoot: string,
-  orderId: string
+  orderId: string,
 ): Promise<ExportDocuments> {
   const files = await getOrderFiles(storageRoot, orderId);
-  const providedDocuments = [...new Set(files.map(file => file.documentType))].filter(isKnownDocumentType);
+  const providedDocuments = [
+    ...new Set(files.map((file) => file.documentType)),
+  ].filter(isKnownDocumentType);
 
-  const invoice = asRecord(firstFileOfType(files, "commercial_invoice")?.content);
+  const invoice = asRecord(
+    firstFileOfType(files, "commercial_invoice")?.content,
+  );
   const packingList = asRecord(firstFileOfType(files, "packing_list")?.content);
-  const billOfLading = asRecord(firstFileOfType(files, "bill_of_lading")?.content);
-  const certificateOfOrigin = asRecord(firstFileOfType(files, "certificate_of_origin")?.content);
-  const importPermit = asRecord(firstFileOfType(files, "import_permit")?.content);
+  const billOfLading = asRecord(
+    firstFileOfType(files, "bill_of_lading")?.content,
+  );
+  const certificateOfOrigin = asRecord(
+    firstFileOfType(files, "certificate_of_origin")?.content,
+  );
+  const importPermit = asRecord(
+    firstFileOfType(files, "import_permit")?.content,
+  );
 
   return {
     invoiceNumber: asString(invoice?.invoiceNumber) ?? "",
@@ -89,9 +128,11 @@ export async function buildExportDocumentsFromUploads(
     grossWeightKg: asNumber(packingList?.grossWeightKg),
     netWeightKg: asNumber(packingList?.netWeightKg),
     billOfLadingNumber: asString(billOfLading?.billOfLadingNumber),
-    certificateOfOriginNumber: asString(certificateOfOrigin?.certificateOfOriginNumber),
+    certificateOfOriginNumber: asString(
+      certificateOfOrigin?.certificateOfOriginNumber,
+    ),
     importPermitNumber: asString(importPermit?.importPermitNumber),
     providedDocuments,
-    items: asItems(invoice?.items)
+    items: asItems(invoice?.items),
   };
 }

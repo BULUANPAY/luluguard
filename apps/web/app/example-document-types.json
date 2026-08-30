@@ -35,6 +35,13 @@
     "providedByExporter": true
   },
   {
+    "type": "digital_product_passport",
+    "label": "DPP 數位產品護照",
+    "detail": "產品碳足跡、減量基準與第三方查證",
+    "required": true,
+    "providedByExporter": true
+  },
+  {
     "type": "import_permit",
     "label": "輸入許可證",
     "detail": "受管制商品適用",

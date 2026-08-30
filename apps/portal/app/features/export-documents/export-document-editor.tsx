@@ -89,8 +89,10 @@ export function ExportDocumentEditor({
 
       {document.document_type === "COMMERCIAL_INVOICE" ? (
         <InvoiceFields document={document} update={update} />
-      ) : (
+      ) : document.document_type === "PACKING_LIST" ? (
         <PackingListFields document={document} update={update} />
+      ) : (
+        <DigitalProductPassportFields document={document} update={update} />
       )}
 
       <IssuerSection
@@ -377,6 +379,177 @@ function PackingListFields({
   );
 }
 
+function DigitalProductPassportFields({
+  document,
+  update,
+}: {
+  document: Extract<
+    ExportDocument,
+    { document_type: "DIGITAL_PRODUCT_PASSPORT" }
+  >;
+  update: UpdateDocument;
+}) {
+  return (
+    <>
+      <Section title="數位產品護照">
+        <TextField
+          label="DPP ID"
+          onChange={(value) =>
+            updateDigitalProductPassport(
+              update,
+              (draft) => (draft.dpp_id = value),
+            )
+          }
+          value={document.dpp_id}
+        />
+        <TextField
+          label="產品名稱"
+          onChange={(value) =>
+            updateDppProduct(update, (draft) => (draft.name = value))
+          }
+          value={document.product.name}
+        />
+        <TextField
+          label="產品型號／學名"
+          onChange={(value) =>
+            updateDppProduct(update, (draft) => (draft.model = value))
+          }
+          value={document.product.model}
+        />
+        <TextField
+          label="HS Code"
+          onChange={(value) =>
+            updateDppProduct(update, (draft) => (draft.hs_code = value))
+          }
+          value={document.product.hs_code}
+        />
+        <TextField
+          label="批次 ID"
+          onChange={(value) =>
+            updateDppProduct(update, (draft) => (draft.batch_id = value))
+          }
+          value={document.product.batch_id}
+        />
+        <NumberField
+          label="數量"
+          onChange={(value) =>
+            updateDppProduct(update, (draft) => (draft.quantity = value))
+          }
+          value={document.product.quantity}
+        />
+        <FixedValue label="單位" value={document.product.unit} />
+      </Section>
+      <Section title="產品碳足跡與第三方查證">
+        <NumberField
+          label="產品碳足跡（kg CO₂e／單位）"
+          onChange={(value) =>
+            updateDppCarbonFootprint(
+              update,
+              (draft) => (draft.product_carbon_footprint_kg_co2e = value),
+            )
+          }
+          value={document.carbon_footprint.product_carbon_footprint_kg_co2e}
+        />
+        <NumberField
+          label="基準碳足跡（kg CO₂e／單位）"
+          onChange={(value) =>
+            updateDppCarbonFootprint(
+              update,
+              (draft) => (draft.baseline_kg_co2e = value),
+            )
+          }
+          value={document.carbon_footprint.baseline_kg_co2e}
+        />
+        <NumberField
+          label="減量比例（%）"
+          onChange={(value) =>
+            updateDppCarbonFootprint(
+              update,
+              (draft) => (draft.reduction_percent = value),
+            )
+          }
+          value={document.carbon_footprint.reduction_percent}
+        />
+        <TextField
+          label="盤查方法"
+          onChange={(value) =>
+            updateDppCarbonFootprint(
+              update,
+              (draft) => (draft.methodology = value),
+            )
+          }
+          value={document.carbon_footprint.methodology}
+        />
+        <TextField
+          label="系統邊界"
+          onChange={(value) =>
+            updateDppCarbonFootprint(
+              update,
+              (draft) => (draft.system_boundary = value),
+            )
+          }
+          value={document.carbon_footprint.system_boundary}
+        />
+        <TextField
+          label="查證標準"
+          onChange={(value) =>
+            updateDppCarbonFootprint(
+              update,
+              (draft) => (draft.verification_standard = value),
+            )
+          }
+          value={document.carbon_footprint.verification_standard}
+        />
+        <TextField
+          label="查證機構"
+          onChange={(value) =>
+            updateDppCarbonFootprint(
+              update,
+              (draft) => (draft.verified_by = value),
+            )
+          }
+          value={document.carbon_footprint.verified_by}
+        />
+        <TextField
+          label="查證時間"
+          onChange={(value) =>
+            updateDppCarbonFootprint(
+              update,
+              (draft) => (draft.verified_at = value),
+            )
+          }
+          placeholder="2026-08-28T09:00:00+01:00"
+          value={document.carbon_footprint.verified_at}
+        />
+      </Section>
+      <Section title="護照效期">
+        <TextField
+          label="生效日"
+          onChange={(value) =>
+            updateDigitalProductPassport(
+              update,
+              (draft) => (draft.validity.valid_from = value),
+            )
+          }
+          type="date"
+          value={document.validity.valid_from}
+        />
+        <TextField
+          label="到期日"
+          onChange={(value) =>
+            updateDigitalProductPassport(
+              update,
+              (draft) => (draft.validity.valid_until = value),
+            )
+          }
+          type="date"
+          value={document.validity.valid_until}
+        />
+      </Section>
+    </>
+  );
+}
+
 function PartySection({
   onChange,
   party,
@@ -619,6 +792,10 @@ function FixedValue({ label, value }: { label: string; value: string }) {
 
 type Invoice = Extract<ExportDocument, { document_type: "COMMERCIAL_INVOICE" }>;
 type PackingList = Extract<ExportDocument, { document_type: "PACKING_LIST" }>;
+type DigitalProductPassport = Extract<
+  ExportDocument,
+  { document_type: "DIGITAL_PRODUCT_PASSPORT" }
+>;
 
 function updateInvoice(
   update: UpdateDocument,
@@ -650,4 +827,29 @@ function updatePackingCargo(
   mutate: (cargo: PackingList["cargo"][number]) => void,
 ) {
   updatePackingList(update, (draft) => mutate(draft.cargo[0]!));
+}
+
+function updateDigitalProductPassport(
+  update: UpdateDocument,
+  mutate: (draft: DigitalProductPassport) => void,
+) {
+  update((draft) => {
+    if (draft.document_type === "DIGITAL_PRODUCT_PASSPORT") mutate(draft);
+  });
+}
+
+function updateDppProduct(
+  update: UpdateDocument,
+  mutate: (product: DigitalProductPassport["product"]) => void,
+) {
+  updateDigitalProductPassport(update, (draft) => mutate(draft.product));
+}
+
+function updateDppCarbonFootprint(
+  update: UpdateDocument,
+  mutate: (carbonFootprint: DigitalProductPassport["carbon_footprint"]) => void,
+) {
+  updateDigitalProductPassport(update, (draft) =>
+    mutate(draft.carbon_footprint),
+  );
 }

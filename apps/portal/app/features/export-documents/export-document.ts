@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export type ExportDocumentType = "COMMERCIAL_INVOICE" | "PACKING_LIST";
+export type ExportDocumentType =
+  "COMMERCIAL_INVOICE" | "PACKING_LIST" | "DIGITAL_PRODUCT_PASSPORT";
 
 export interface Party {
   name: string;
@@ -100,7 +101,35 @@ export interface PackingList extends ExportDocumentBase {
   };
 }
 
-export type ExportDocument = CommercialInvoice | PackingList;
+export interface DigitalProductPassport extends ExportDocumentBase {
+  document_type: "DIGITAL_PRODUCT_PASSPORT";
+  dpp_id: string;
+  product: {
+    name: string;
+    model: string;
+    hs_code: string;
+    batch_id: string;
+    quantity: number;
+    unit: "HEAD";
+  };
+  carbon_footprint: {
+    product_carbon_footprint_kg_co2e: number;
+    baseline_kg_co2e: number;
+    reduction_percent: number;
+    methodology: string;
+    system_boundary: string;
+    verification_standard: string;
+    verified_by: string;
+    verified_at: string;
+  };
+  validity: {
+    valid_from: string;
+    valid_until: string;
+  };
+}
+
+export type ExportDocument =
+  CommercialInvoice | PackingList | DigitalProductPassport;
 
 const partySchema = z
   .object({
@@ -220,9 +249,42 @@ const packingListSchema = documentBaseSchema.extend({
     .object({ mark: z.string(), range: z.string() })
     .passthrough(),
 });
+const digitalProductPassportSchema = documentBaseSchema.extend({
+  document_type: z.literal("DIGITAL_PRODUCT_PASSPORT"),
+  dpp_id: z.string().trim().min(1),
+  product: z
+    .object({
+      name: z.string().trim().min(1),
+      model: z.string().trim().min(1),
+      hs_code: z.string().trim().min(1),
+      batch_id: z.string().trim().min(1),
+      quantity: z.number().positive(),
+      unit: z.literal("HEAD"),
+    })
+    .passthrough(),
+  carbon_footprint: z
+    .object({
+      product_carbon_footprint_kg_co2e: z.number().nonnegative(),
+      baseline_kg_co2e: z.number().positive(),
+      reduction_percent: z.number().min(0).max(100),
+      methodology: z.string().trim().min(1),
+      system_boundary: z.string().trim().min(1),
+      verification_standard: z.string().trim().min(1),
+      verified_by: z.string().trim().min(1),
+      verified_at: z.string().trim().min(1),
+    })
+    .passthrough(),
+  validity: z
+    .object({
+      valid_from: z.string().trim().min(1),
+      valid_until: z.string().trim().min(1),
+    })
+    .passthrough(),
+});
 const exportDocumentSchema = z.discriminatedUnion("document_type", [
   invoiceSchema,
   packingListSchema,
+  digitalProductPassportSchema,
 ]);
 
 const DEMO_METADATA: DemoMetadata = {
@@ -297,6 +359,33 @@ export function createEmptyExportDocument(
         total_amount: 0,
         currency: "USD",
       },
+    };
+  }
+
+  if (documentType === "DIGITAL_PRODUCT_PASSPORT") {
+    return {
+      ...common,
+      document_type: "DIGITAL_PRODUCT_PASSPORT",
+      dpp_id: "",
+      product: {
+        name: "",
+        model: "",
+        hs_code: "",
+        batch_id: "",
+        quantity: 0,
+        unit: "HEAD",
+      },
+      carbon_footprint: {
+        product_carbon_footprint_kg_co2e: 0,
+        baseline_kg_co2e: 0,
+        reduction_percent: 0,
+        methodology: "",
+        system_boundary: "",
+        verification_standard: "",
+        verified_by: "",
+        verified_at: "",
+      },
+      validity: { valid_from: "", valid_until: "" },
     };
   }
 
@@ -401,6 +490,37 @@ export function createTestExportDocument(
     };
   }
 
+  if (documentType === "DIGITAL_PRODUCT_PASSPORT") {
+    return {
+      ...common,
+      document_type: "DIGITAL_PRODUCT_PASSPORT",
+      document_id: "DPP-UNI-20260829-001",
+      dpp_id: "DPP-UNICORN-SCO-20260829-001",
+      product: {
+        name: "Unicorn",
+        model: "Equus unicornis scoticus",
+        hs_code: "0101.21",
+        batch_id: "DPP-UNICORN-SCO-20260829-001",
+        quantity: 10000,
+        unit: "HEAD",
+      },
+      carbon_footprint: {
+        product_carbon_footprint_kg_co2e: 360,
+        baseline_kg_co2e: 500,
+        reduction_percent: 28,
+        methodology: "ISO 14067 product carbon footprint",
+        system_boundary: "Cradle-to-port",
+        verification_standard: "ISO 14064-3",
+        verified_by: "Caledonia Carbon Verification Ltd.",
+        verified_at: "2026-08-28T09:00:00+01:00",
+      },
+      validity: {
+        valid_from: "2026-08-29",
+        valid_until: "2027-08-28",
+      },
+    };
+  }
+
   return {
     ...common,
     document_type: "PACKING_LIST",
@@ -450,10 +570,11 @@ export function parseExportDocument(
   }
   if (
     value.document_type !== "COMMERCIAL_INVOICE" &&
-    value.document_type !== "PACKING_LIST"
+    value.document_type !== "PACKING_LIST" &&
+    value.document_type !== "DIGITAL_PRODUCT_PASSPORT"
   ) {
     throw new Error(
-      "document_type 必須是 COMMERCIAL_INVOICE 或 PACKING_LIST。",
+      "document_type 必須是 COMMERCIAL_INVOICE、PACKING_LIST 或 DIGITAL_PRODUCT_PASSPORT。",
     );
   }
   if (expectedType && value.document_type !== expectedType) {

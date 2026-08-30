@@ -40,6 +40,35 @@ test("builds broker documents from every uploaded order file", () => {
       packages: { total_packages: 2 },
       weight: { gross_weight_kg: 20, net_weight_kg: 18 },
     }),
+    file("digital_product_passport", {
+      payload: {
+        document_type: "DIGITAL_PRODUCT_PASSPORT",
+        document_id: "DPP-DOC-1",
+        dpp_id: "DPP-BATCH-1",
+        product: {
+          name: "Goods",
+          model: "Model",
+          hs_code: "0101.21",
+          batch_id: "DPP-BATCH-1",
+          quantity: 2,
+          unit: "HEAD",
+        },
+        carbon_footprint: {
+          product_carbon_footprint_kg_co2e: 80,
+          baseline_kg_co2e: 100,
+          reduction_percent: 20,
+          methodology: "ISO 14067",
+          system_boundary: "Cradle-to-port",
+          verification_standard: "ISO 14064-3",
+          verified_by: "Verifier",
+          verified_at: "2026-08-28T00:00:00Z",
+        },
+        validity: {
+          valid_from: "2026-08-28",
+          valid_until: "2027-08-28",
+        },
+      },
+    }),
   ]);
 
   assert.equal(documents.invoiceNumber, "INV-1");
@@ -48,8 +77,14 @@ test("builds broker documents from every uploaded order file", () => {
   assert.deepEqual(documents.providedDocuments, [
     "commercial_invoice",
     "packing_list",
+    "digital_product_passport",
   ]);
   assert.equal(documents.packageCount, 2);
+  assert.equal(documents.digitalProductPassport?.dppId, "DPP-BATCH-1");
+  assert.equal(
+    documents.digitalProductPassport?.carbonFootprint.claimedReductionPercent,
+    20,
+  );
 });
 
 test("rejects orders without files and non-USD invoices", () => {
