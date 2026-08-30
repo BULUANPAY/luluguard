@@ -6,9 +6,10 @@ import type { SignedExportDocumentEnvelope } from "./signing-client";
 
 describe("signed response download", () => {
   it.each([
-    ["COMMERCIAL_INVOICE", "I-V"],
-    ["PACKING_LIST", "P-L"],
-  ] as const)("builds a safe %s response file name", (documentType, label) => {
+    "COMMERCIAL_INVOICE",
+    "PACKING_LIST",
+    "DIGITAL_PRODUCT_PASSPORT",
+  ] as const)("builds a safe %s response file name", (documentType) => {
     const payload = createTestExportDocument(
       documentType,
       '森沐/實業:台灣* "Demo"',
@@ -27,8 +28,10 @@ describe("signed response download", () => {
       signerId: "signer-123",
     };
 
+    envelope.payload.document_id = 'DOC/2026:08*29 "Demo"';
+
     expect(buildSignedResponseFileName(envelope)).toBe(
-      `森沐-實業-台灣- -Demo-_${label}_2026-08-29.json`,
+      `${documentType}_DOC-2026-08-29 -Demo-.json`,
     );
   });
 });
