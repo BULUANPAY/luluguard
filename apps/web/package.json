@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node --env-file-if-exists=../../.env node_modules/next/dist/bin/next build",
     "check-types": "tsc --noEmit",
-    "dev": "node --env-file-if-exists=../../.env node_modules/next/dist/bin/next dev",
+    "dev": "node --import=../../scripts/load-root-env.mjs node_modules/next/dist/bin/next dev",
     "lint": "eslint .",
     "start": "node --env-file-if-exists=../../.env node_modules/next/dist/bin/next start",
     "test": "node --import tsx --test test/*.test.ts"
