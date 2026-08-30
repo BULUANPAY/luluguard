@@ -576,8 +576,6 @@ test("missing required documents are blocked before broker transmission", async 
   assert.equal(result.transmittedToBroker, false);
   assert.equal(brokerCalled, false);
   assert.deepEqual(result.documentReview.missingRequiredDocuments.sort(), [
-    "bill_of_lading",
-    "digital_product_passport",
     "packing_list",
   ]);
 });

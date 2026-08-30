@@ -1,30 +1,25 @@
 import { createHash } from "node:crypto";
+import { TRADE_DOCUMENT_TYPES } from "@luluguard/shared";
 import type { ExportDocuments, TradeDocumentType } from "./domain.js";
 
 export const availableMockDocuments: Array<{
   type: TradeDocumentType;
   label: string;
   required: boolean;
-}> = [
-  { type: "commercial_invoice", label: "商業發票", required: true },
-  { type: "packing_list", label: "裝箱單", required: true },
-  { type: "bill_of_lading", label: "海運提單", required: true },
-  { type: "certificate_of_origin", label: "產地證明", required: false },
-  { type: "product_specification", label: "產品規格書", required: false },
-  {
-    type: "digital_product_passport",
-    label: "DPP 數位產品護照",
-    required: true,
-  },
-  { type: "import_permit", label: "輸入許可證", required: false },
-];
+}> = TRADE_DOCUMENT_TYPES.map((document) => ({
+  type: document.type,
+  label: document.label,
+  required: document.required,
+}));
 
 export const defaultMockDocumentTypes = availableMockDocuments
   .filter(
     (document) =>
       document.required ||
+      document.type === "bill_of_lading" ||
       document.type === "certificate_of_origin" ||
-      document.type === "product_specification",
+      document.type === "product_specification" ||
+      document.type === "digital_product_passport",
   )
   .map((document) => document.type);
 

@@ -1,3 +1,4 @@
+import { isTradeDocumentType } from "@luluguard/shared";
 import type {
   ExportDocuments,
   DigitalProductPassportData,
@@ -56,17 +57,7 @@ function documentType(
         : undefined;
   const candidate = declared ?? storedType ?? inferred;
   if (!candidate) return undefined;
-  return [
-    "commercial_invoice",
-    "packing_list",
-    "bill_of_lading",
-    "certificate_of_origin",
-    "product_specification",
-    "digital_product_passport",
-    "import_permit",
-  ].includes(candidate)
-    ? (candidate as TradeDocumentType)
-    : undefined;
+  return isTradeDocumentType(candidate) ? candidate : undefined;
 }
 
 export function buildExportDocuments(files: OrderFile[]): ExportDocuments {

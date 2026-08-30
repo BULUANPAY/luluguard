@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
+    "@luluguard/shared": "workspace:*",
     "@luluguard/vlei-json-verify-mcp": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.17.3",
     "@repo/vlei-json-signing": "workspace:*",

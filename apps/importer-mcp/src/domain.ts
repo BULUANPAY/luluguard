@@ -1,3 +1,7 @@
+import type { TradeDocumentType } from "@luluguard/shared";
+
+export type { TradeDocumentType };
+
 export interface TradeItem {
   description: string;
   model: string;
@@ -8,15 +12,6 @@ export interface TradeItem {
   hsCode?: string;
   dppBatchId?: string;
 }
-
-export type TradeDocumentType =
-  | "commercial_invoice"
-  | "packing_list"
-  | "bill_of_lading"
-  | "certificate_of_origin"
-  | "product_specification"
-  | "digital_product_passport"
-  | "import_permit";
 
 export interface DigitalProductPassportData {
   documentId: string;
