@@ -273,6 +273,7 @@ async function generateWithGemini(
   let response = await chat.sendMessage({
     message: options.messages.at(-1)?.content ?? "",
   });
+  const initialFunctionCalls = response.functionCalls ?? [];
   writeAudit({
     traceId: options.traceId,
     parentSpanId,
@@ -284,8 +285,8 @@ async function generateWithGemini(
       provider: "gemini",
       model,
       round: 0,
-      text: response.text,
-      functionCalls: response.functionCalls,
+      text: initialFunctionCalls.length === 0 ? response.text : undefined,
+      functionCalls: initialFunctionCalls,
     },
   });
 
@@ -359,6 +360,7 @@ async function generateWithGemini(
     });
     options.onProgress?.("MCP 已回傳結果，正在整理回覆…");
     response = await chat.sendMessage({ message: functionResponses });
+    const nextFunctionCalls = response.functionCalls ?? [];
     writeAudit({
       traceId: options.traceId,
       parentSpanId,
@@ -370,8 +372,8 @@ async function generateWithGemini(
         provider: "gemini",
         model,
         round: round + 1,
-        text: response.text,
-        functionCalls: response.functionCalls,
+        text: nextFunctionCalls.length === 0 ? response.text : undefined,
+        functionCalls: nextFunctionCalls,
       },
     });
   }

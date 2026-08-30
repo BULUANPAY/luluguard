@@ -132,3 +132,12 @@ export function mcpResultText(result: unknown): string {
     .map((item) => item.text)
     .join("\n");
 }
+
+export function mcpResultIsError(result: unknown): boolean {
+  return Boolean(
+    result &&
+      typeof result === "object" &&
+      "isError" in result &&
+      result.isError,
+  );
+}
