@@ -35,6 +35,35 @@ function isNonNegative(value: number | undefined): value is number {
   return value !== undefined && Number.isFinite(value) && value >= 0;
 }
 
+function normalized(value: string | undefined): string {
+  return value?.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US") ?? "";
+}
+
+function packingCargoMatchesInvoice(documents: ExportDocuments): boolean {
+  const cargo = documents.packingList?.cargo ?? [];
+  if (cargo.length === 0) return true;
+  if (cargo.length !== documents.items.length) return false;
+
+  const unmatched = [...cargo];
+  return documents.items.every((invoiceItem) => {
+    const matchIndex = unmatched.findIndex(
+      (packingItem) =>
+        normalized(packingItem.description) ===
+          normalized(invoiceItem.description) &&
+        packingItem.quantity === invoiceItem.quantity &&
+        (!packingItem.unit ||
+          !invoiceItem.unit ||
+          normalized(packingItem.unit) === normalized(invoiceItem.unit)) &&
+        (!packingItem.dppBatchId ||
+          !invoiceItem.dppBatchId ||
+          packingItem.dppBatchId === invoiceItem.dppBatchId),
+    );
+    if (matchIndex < 0) return false;
+    unmatched.splice(matchIndex, 1);
+    return true;
+  });
+}
+
 export function reviewDocumentsBeforeTransmission(
   documents: ExportDocuments,
   now = new Date(),
@@ -69,6 +98,41 @@ export function reviewDocumentsBeforeTransmission(
       severity: "blocker",
       message:
         "Commercial invoice data is incomplete or contains invalid numeric values.",
+    });
+  }
+  if (
+    selected.has("packing_list") &&
+    documents.packingList?.relatedInvoice &&
+    documents.packingList.relatedInvoice !== documents.invoiceNumber
+  ) {
+    findings.push({
+      code: "PACKING_LIST_INVOICE_MISMATCH",
+      severity: "blocker",
+      message: "Packing list references a different commercial invoice.",
+    });
+  }
+  if (
+    selected.has("packing_list") &&
+    ((documents.packingList?.exporter &&
+      normalized(documents.packingList.exporter) !==
+        normalized(documents.exporter)) ||
+      (documents.packingList?.importer &&
+        normalized(documents.packingList.importer) !==
+          normalized(documents.importer)))
+  ) {
+    findings.push({
+      code: "PACKING_LIST_PARTY_MISMATCH",
+      severity: "blocker",
+      message:
+        "Packing list exporter or importer does not match the commercial invoice.",
+    });
+  }
+  if (selected.has("packing_list") && !packingCargoMatchesInvoice(documents)) {
+    findings.push({
+      code: "PACKING_LIST_PRODUCT_MISMATCH",
+      severity: "blocker",
+      message:
+        "Packing list cargo description, quantity, unit, or batch does not match the commercial invoice items.",
     });
   }
   if (

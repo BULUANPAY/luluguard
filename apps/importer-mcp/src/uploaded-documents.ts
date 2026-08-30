@@ -93,6 +93,9 @@ export function buildExportDocuments(files: OrderFile[]): ExportDocuments {
   const shipment = object(invoice?.shipment);
   const packages = object(packingList?.packages);
   const weight = object(packingList?.weight);
+  const packingExporter = object(packingList?.exporter);
+  const packingImporter = object(packingList?.importer);
+  const packingShipment = object(packingList?.shipment);
 
   if (invoice && invoice.currency !== "USD") {
     throw new Error(
@@ -112,6 +115,7 @@ export function buildExportDocuments(files: OrderFile[]): ExportDocuments {
             intendedUse:
               text(item.intendedUse) ?? text(item.intended_use) ?? "",
             quantity: number(item.quantity) ?? 0,
+            unit: text(item.unit),
             unitPriceUsd:
               number(item.unitPriceUsd) ?? number(item.unit_price) ?? 0,
             hsCode: text(item.hsCode) ?? text(item.hs_code),
@@ -164,10 +168,27 @@ export function buildExportDocuments(files: OrderFile[]): ExportDocuments {
         },
       }
     : undefined;
+  const packingCargo = Array.isArray(packingList?.cargo)
+    ? packingList.cargo.flatMap((value) => {
+        const item = object(value);
+        if (!item) return [];
+        return [
+          {
+            description: text(item.description) ?? "",
+            quantity: number(item.quantity) ?? 0,
+            unit: text(item.unit),
+            dppBatchId: text(item.dppBatchId) ?? text(item.dpp_batch_id),
+          },
+        ];
+      })
+    : [];
 
   return {
     invoiceNumber:
-      text(invoice?.invoiceNumber) ?? text(invoice?.document_id) ?? "",
+      text(invoice?.invoiceNumber) ??
+      text(invoice?.invoice_number) ??
+      text(invoice?.document_id) ??
+      "",
     invoiceDate: text(invoice?.invoiceDate) ?? text(invoice?.issue_date),
     exporter: text(exporter?.name) ?? "",
     importer: text(importer?.name) ?? "",
@@ -190,6 +211,21 @@ export function buildExportDocuments(files: OrderFile[]): ExportDocuments {
       number(packingList?.grossWeightKg) ?? number(weight?.gross_weight_kg),
     netWeightKg:
       number(packingList?.netWeightKg) ?? number(weight?.net_weight_kg),
+    packingList: packingList
+      ? {
+          relatedInvoice:
+            text(packingList.relatedInvoice) ??
+            text(packingList.related_invoice),
+          exporter: text(packingExporter?.name),
+          importer: text(packingImporter?.name),
+          vessel: text(packingShipment?.vessel),
+          totalQuantity:
+            number(packingList.totalQuantity) ??
+            number(packages?.total_quantity),
+          unit: text(packingList.unit) ?? text(packages?.unit),
+          cargo: packingCargo,
+        }
+      : undefined,
     billOfLadingNumber:
       text(billOfLading?.billOfLadingNumber) ?? text(billOfLading?.document_id),
     certificateOfOriginNumber:

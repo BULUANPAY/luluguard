@@ -11,9 +11,25 @@ export interface TradeItem {
   material: string;
   intendedUse: string;
   quantity: number;
+  unit?: string;
   unitPriceUsd: number;
   hsCode?: string;
   dppBatchId?: string;
+}
+
+export interface PackingListData {
+  relatedInvoice?: string;
+  exporter?: string;
+  importer?: string;
+  vessel?: string;
+  totalQuantity?: number;
+  unit?: string;
+  cargo: Array<{
+    description: string;
+    quantity: number;
+    unit?: string;
+    dppBatchId?: string;
+  }>;
 }
 
 export interface DigitalProductPassportData {
@@ -57,6 +73,7 @@ export interface ExportDocuments {
   packageCount?: number;
   grossWeightKg?: number;
   netWeightKg?: number;
+  packingList?: PackingListData;
   billOfLadingNumber?: string;
   certificateOfOriginNumber?: string;
   importPermitNumber?: string;
