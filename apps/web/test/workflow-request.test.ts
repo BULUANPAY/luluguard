@@ -34,10 +34,28 @@ test("accepts the estimate and authorization confirmation sent by the UI", () =>
     workflowAction: "broker_quote",
     orderId: "ORDER-1",
     preflightId: "PREFLIGHT-1",
+    customsAuthorizationAcceptedAt: "2026-08-30T06:00:00.000Z",
   });
 
   assert.equal(request.estimateApproved, true);
   assert.equal(request.workflowAction, "broker_quote");
+  assert.equal(
+    request.customsAuthorizationAcceptedAt,
+    "2026-08-30T06:00:00.000Z",
+  );
+});
+
+test("rejects a broker quote without a power-of-attorney consent record", () => {
+  assert.throws(
+    () =>
+      parseWorkflowRequest({
+        messages: [{ role: "user", content: "我確認進口商預估。" }],
+        workflowAction: "broker_quote",
+        orderId: "ORDER-1",
+        preflightId: "PREFLIGHT-1",
+      }),
+    /委任書同意紀錄/,
+  );
 });
 
 test("rejects a payment action without explicit approval", () => {

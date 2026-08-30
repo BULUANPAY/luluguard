@@ -8,6 +8,7 @@ export interface WorkflowRequest {
   orderId?: string;
   preflightId?: string;
   quoteId?: string;
+  customsAuthorizationAcceptedAt?: string;
   estimateApproved: boolean;
   paymentApproved: boolean;
 }
@@ -89,6 +90,10 @@ export function parseWorkflowRequest(value: unknown): WorkflowRequest {
   const orderId = optionalIdentifier(value.orderId, "orderId");
   const preflightId = optionalIdentifier(value.preflightId, "preflightId");
   const quoteId = optionalIdentifier(value.quoteId, "quoteId");
+  const customsAuthorizationAcceptedAt = optionalIsoTimestamp(
+    value.customsAuthorizationAcceptedAt,
+    "customsAuthorizationAcceptedAt",
+  );
   const estimateDenied =
     /(不|未|拒絕).{0,6}(確認|同意|核准).{0,16}(預估|估價)|(不確認|不同意|不核准).{0,16}(預估|估價)/i.test(
       latest.content,
@@ -109,8 +114,16 @@ export function parseWorkflowRequest(value: unknown): WorkflowRequest {
   if (action === "precheck" && !orderId) {
     throw new WorkflowRequestError("文件預檢需要 orderId");
   }
-  if (action === "broker_quote" && (!preflightId || !estimateApproved)) {
-    throw new WorkflowRequestError("詢價需要 preflightId 與明確的預估確認");
+  if (
+    action === "broker_quote" &&
+    (!orderId ||
+      !preflightId ||
+      !estimateApproved ||
+      !customsAuthorizationAcceptedAt)
+  ) {
+    throw new WorkflowRequestError(
+      "詢價需要 orderId、preflightId、明確的預估確認與委任書同意紀錄",
+    );
   }
   if (action === "payment" && (!orderId || !quoteId || !paymentApproved)) {
     throw new WorkflowRequestError(
@@ -124,9 +137,22 @@ export function parseWorkflowRequest(value: unknown): WorkflowRequest {
     orderId,
     preflightId,
     quoteId,
+    customsAuthorizationAcceptedAt,
     estimateApproved,
     paymentApproved,
   };
+}
+
+function optionalIsoTimestamp(value: unknown, name: string) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (
+    typeof value !== "string" ||
+    value.length > 64 ||
+    !Number.isFinite(Date.parse(value))
+  ) {
+    throw new WorkflowRequestError(`${name} 格式不正確`);
+  }
+  return new Date(value).toISOString();
 }
 
 function optionalIdentifier(value: unknown, name: string) {

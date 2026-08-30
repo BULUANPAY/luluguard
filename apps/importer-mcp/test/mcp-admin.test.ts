@@ -3,6 +3,7 @@ import { createServer as createHttpServer, type Server } from "node:http";
 import { test } from "node:test";
 import { encodePaymentResponseHeader } from "@x402/core/http";
 import type { SettleResponse } from "@x402/core/types";
+import type { CustomsPowerOfAttorney } from "@luluguard/shared";
 import type { SettlementReconciliationRecord } from "../src/importer-agent.js";
 import type { DutyQuote } from "../src/domain.js";
 import type { PaymentDispatchAwareFetch } from "../src/payment/client.js";
@@ -11,6 +12,28 @@ const adminKey = "admin-test-key";
 const network = "eip155:84532" as const;
 const brokerAddress = "0x2222222222222222222222222222222222222222";
 const importerAddress = "0x1111111111111111111111111111111111111111";
+
+function powerOfAttorney(orderId: string): CustomsPowerOfAttorney {
+  return {
+    documentType: "power_of_attorney",
+    documentId: `LOA-${orderId}`,
+    version: "1.0",
+    orderId,
+    acceptedAt: "2026-08-30T06:00:00.000Z",
+    importer: { name: "Importer", lei: "254900A1B2C3D4E5F667" },
+    representative: {
+      employeeId: "EMP-TEST",
+      name: "Test User",
+      role: "Import Operations Manager",
+    },
+    scope: ["取得報關服務報價"],
+    vleiAuthorization: {
+      authorizationId: "VLEI-AUTH-TEST",
+      signerAid: "EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      signerCredentialSaid: "ECCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+    },
+  };
+}
 
 process.env.CUSTOMS_BROKER_ADDRESS = brokerAddress;
 process.env.IMPORTER_ADDRESS = importerAddress;
@@ -98,7 +121,11 @@ async function seedReconciliation(): Promise<{
     stores.paymentReservationStore,
   );
   const preflight = agent.precheck(orderId, getMockExportDocuments(orderId));
-  await agent.getQuote(preflight.preflightId, true);
+  await agent.getQuote(
+    preflight.preflightId,
+    true,
+    powerOfAttorney(orderId),
+  );
   await assert.rejects(
     () => agent.submit(orderId, quoteId, true),
     /settlement_pending/,

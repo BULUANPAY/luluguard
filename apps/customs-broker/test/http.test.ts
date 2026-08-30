@@ -47,6 +47,28 @@ const documents: ExportDocuments = {
   grossWeightKg: 18.4,
   netWeightKg: 15.2,
   billOfLadingNumber: "ONEYTYOTEST",
+  powerOfAttorney: {
+    documentType: "power_of_attorney",
+    documentId: "LOA-HTTP-001",
+    version: "1.0",
+    orderId: "ORDER-HTTP-001",
+    acceptedAt: "2026-08-29T00:00:00.000Z",
+    importer: {
+      name: "Formosa Industrial Systems Co., Ltd.",
+      lei: "549300HTTPTEST000001"
+    },
+    representative: {
+      employeeId: "EMP-HTTP-001",
+      name: "Test Importer",
+      role: "Import Operations Manager"
+    },
+    scope: ["Transmit order documents for customs quotation"],
+    vleiAuthorization: {
+      authorizationId: "AUTH-HTTP-001",
+      signerAid: "EHttpSignerAid",
+      signerCredentialSaid: "EHttpCredentialSaid"
+    }
+  },
   providedDocuments: [
     "commercial_invoice",
     "packing_list",

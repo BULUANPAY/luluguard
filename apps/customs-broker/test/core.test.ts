@@ -41,6 +41,25 @@ const documents: ExportDocuments = {
   billOfLadingNumber: "BL-001",
   certificateOfOriginNumber: "COO-001",
   importPermitNumber: "PERMIT-001",
+  powerOfAttorney: {
+    documentType: "power_of_attorney",
+    documentId: "LOA-CORE-001",
+    version: "1.0",
+    orderId: "ORDER-CORE-001",
+    acceptedAt: "2026-08-29T00:00:00.000Z",
+    importer: { name: "Importer Ltd", lei: "549300CORETEST000001" },
+    representative: {
+      employeeId: "EMP-CORE-001",
+      name: "Test Importer",
+      role: "Import Operations Manager"
+    },
+    scope: ["Transmit order documents for customs quotation"],
+    vleiAuthorization: {
+      authorizationId: "AUTH-CORE-001",
+      signerAid: "ECoreSignerAid",
+      signerCredentialSaid: "ECoreCredentialSaid"
+    }
+  },
   providedDocuments: ["commercial_invoice", "packing_list", "power_of_attorney"],
   items: [{
     description: "Widget",
@@ -122,6 +141,10 @@ test("validates required document types, cross-field data, uniqueness, and stric
     ] as const
   };
   assert.equal(QuoteRequestSchema.safeParse(completeDocuments).success, true);
+  assert.equal(QuoteRequestSchema.safeParse({
+    ...completeDocuments,
+    powerOfAttorney: undefined
+  }).success, false);
   assert.equal(QuoteRequestSchema.safeParse({
     ...completeDocuments,
     providedDocuments: ["commercial_invoice", "packing_list"]
@@ -240,7 +263,8 @@ test("canonical document hashing uses locale-independent key ordering", () => {
     netWeightKg: documents.netWeightKg,
     billOfLadingNumber: documents.billOfLadingNumber,
     certificateOfOriginNumber: documents.certificateOfOriginNumber,
-    importPermitNumber: documents.importPermitNumber
+    importPermitNumber: documents.importPermitNumber,
+    powerOfAttorney: documents.powerOfAttorney
   } satisfies ExportDocuments;
   assert.equal(hashDocuments(documents), hashDocuments(reordered));
   assert.equal(

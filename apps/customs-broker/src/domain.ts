@@ -1,6 +1,7 @@
 import {
   REQUIRED_TRADE_DOCUMENT_TYPES,
   TRADE_DOCUMENT_TYPES,
+  type CustomsPowerOfAttorney,
   type TradeDocumentType
 } from "@luluguard/shared";
 import { z } from "zod";
@@ -34,6 +35,30 @@ const money = z.number()
   .max(MAX_MONEY_USD)
   .refine(hasAtMostTwoDecimalPlaces, "must have at most two decimal places");
 const positiveInteger = (max: number) => z.number().finite().int().positive().max(max);
+
+export const CustomsPowerOfAttorneySchema: z.ZodType<CustomsPowerOfAttorney> =
+  z.object({
+    documentType: z.literal("power_of_attorney"),
+    documentId: boundedText(256),
+    version: z.literal("1.0"),
+    orderId: boundedText(128),
+    acceptedAt: z.string().datetime(),
+    importer: z.object({
+      name: boundedText(256),
+      lei: boundedText(64),
+    }).strict(),
+    representative: z.object({
+      employeeId: boundedText(128),
+      name: boundedText(256),
+      role: boundedText(128),
+    }).strict(),
+    scope: z.array(boundedText(256)).min(1).max(20),
+    vleiAuthorization: z.object({
+      authorizationId: boundedText(256),
+      signerAid: boundedText(512),
+      signerCredentialSaid: boundedText(512),
+    }).strict(),
+  }).strict();
 
 export const tradeDocumentTypes = TRADE_DOCUMENT_TYPES.map(
   (document) => document.type
@@ -78,6 +103,7 @@ export const ExportDocumentsSchema = z.object({
   billOfLadingNumber: z.string().trim().min(1).max(128).optional(),
   certificateOfOriginNumber: z.string().trim().min(1).max(128).optional(),
   importPermitNumber: z.string().trim().min(1).max(128).optional(),
+  powerOfAttorney: CustomsPowerOfAttorneySchema.optional(),
   providedDocuments: z.array(z.enum(tradeDocumentTypes))
     .min(1)
     .max(tradeDocumentTypes.length)
@@ -117,6 +143,16 @@ export const QuoteRequestSchema = ExportDocumentsSchema.superRefine((documents, 
         message: `required document is missing: ${documentType}`
       });
     }
+  }
+  if (
+    provided.has("power_of_attorney") &&
+    documents.powerOfAttorney === undefined
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["powerOfAttorney"],
+      message: "power_of_attorney requires the attached authorization document",
+    });
   }
   if (provided.has("commercial_invoice") && (
     documents.invoiceDate === undefined ||

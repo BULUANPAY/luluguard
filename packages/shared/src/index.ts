@@ -9,6 +9,29 @@ export type {
   TradeDocumentTypeDefinition,
 } from "./document-types.js";
 
+export interface CustomsPowerOfAttorney {
+  documentType: "power_of_attorney";
+  documentId: string;
+  version: "1.0";
+  orderId: string;
+  acceptedAt: string;
+  importer: {
+    name: string;
+    lei: string;
+  };
+  representative: {
+    employeeId: string;
+    name: string;
+    role: string;
+  };
+  scope: string[];
+  vleiAuthorization: {
+    authorizationId: string;
+    signerAid: string;
+    signerCredentialSaid: string;
+  };
+}
+
 export const PERMISSIONS = [
   "dashboard:read",
   "shipment:read",

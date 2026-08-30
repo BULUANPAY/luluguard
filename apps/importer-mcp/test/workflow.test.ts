@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { encodePaymentResponseHeader } from "@x402/core/http";
 import type { SettleResponse } from "@x402/core/types";
+import type { CustomsPowerOfAttorney } from "@luluguard/shared";
 import {
   ImporterAgent,
   type SettlementReconciliationRecord
@@ -17,6 +18,28 @@ const network = "eip155:84532";
 
 const quoteId = validDutyQuote.quoteId;
 const quote = validDutyQuote;
+
+function powerOfAttorney(orderId: string): CustomsPowerOfAttorney {
+  return {
+    documentType: "power_of_attorney",
+    documentId: `LOA-${orderId}`,
+    version: "1.0",
+    orderId,
+    acceptedAt: "2026-08-30T06:00:00.000Z",
+    importer: { name: "Importer", lei: "254900A1B2C3D4E5F667" },
+    representative: {
+      employeeId: "EMP-TEST",
+      name: "Test User",
+      role: "Import Operations Manager",
+    },
+    scope: ["取得報關服務報價"],
+    vleiAuthorization: {
+      authorizationId: "VLEI-AUTH-TEST",
+      signerAid: "EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      signerCredentialSaid: "ECCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+    },
+  };
+}
 
 const successfulSettlement: SettleResponse = {
   success: true,
@@ -92,7 +115,7 @@ function createAgent(
 
 async function precheckAndQuote(agent: ImporterAgent, orderId: string) {
   const preflight = agent.precheck(orderId, getMockExportDocuments(orderId));
-  return agent.getQuote(preflight.preflightId, true);
+  return agent.getQuote(preflight.preflightId, true, powerOfAttorney(orderId));
 }
 
 function retryingPaidFetch(firstSettlementHeader: string | null, firstStatus = 200): PaymentDispatchAwareFetch {
@@ -525,7 +548,11 @@ test("submission rechecks quote expiration immediately before payment", async ()
     "TEST-EXPIRED",
     getMockExportDocuments("TEST-EXPIRED"),
   );
-  const result = await agent.getQuote(preflight.preflightId, true);
+  const result = await agent.getQuote(
+    preflight.preflightId,
+    true,
+    powerOfAttorney("TEST-EXPIRED"),
+  );
   assert.equal(result.complianceReview.paymentAllowed, false);
   await assert.rejects(
     () => agent.submit("TEST-EXPIRED", quoteId, true),
@@ -577,8 +604,46 @@ test("missing required documents are blocked before broker transmission", async 
   assert.equal(brokerCalled, false);
   assert.deepEqual(result.documentReview.missingRequiredDocuments.sort(), [
     "packing_list",
-    "power_of_attorney",
   ]);
+});
+
+test("attaches the accepted power of attorney before broker transmission", async () => {
+  const orderId = "TEST-POWER-OF-ATTORNEY";
+  let transmittedDocuments: Record<string, unknown> | undefined;
+  const agent = createAgent(
+    undefined,
+    undefined,
+    async (_input, init) => {
+      transmittedDocuments = JSON.parse(String(init?.body)) as Record<
+        string,
+        unknown
+      >;
+      return new Response(JSON.stringify({ quote }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  );
+  const documents = getMockExportDocuments(orderId);
+  documents.providedDocuments = documents.providedDocuments.filter(
+    (documentType) => documentType !== "power_of_attorney",
+  );
+  const preflight = agent.precheck(orderId, documents);
+
+  assert.equal(preflight.readyForBroker, true);
+  const authorizationDocument = powerOfAttorney(orderId);
+  const result = await agent.getQuote(
+    preflight.preflightId,
+    true,
+    authorizationDocument,
+  );
+
+  assert.equal(result.documents.powerOfAttorney?.documentId, authorizationDocument.documentId);
+  assert.ok(result.documents.providedDocuments.includes("power_of_attorney"));
+  assert.deepEqual(
+    transmittedDocuments?.powerOfAttorney,
+    authorizationDocument,
+  );
 });
 
 test("validates DPP and classifies the product as low carbon before transmission", () => {
@@ -688,7 +753,12 @@ test("broker quote requires explicit estimate confirmation", async () => {
     getMockExportDocuments("TEST-NO-CONFIRM"),
   );
   await assert.rejects(
-    () => agent.getQuote(preflight.preflightId, false),
+    () =>
+      agent.getQuote(
+        preflight.preflightId,
+        false,
+        powerOfAttorney("TEST-NO-CONFIRM"),
+      ),
     /must confirm/,
   );
   assert.equal(brokerCalled, false);
@@ -722,7 +792,12 @@ test("malformed broker quotes are rejected before entering the quote store", asy
     const orderId = `TEST-MALFORMED-QUOTE-${index}`;
     const preflight = agent.precheck(orderId, getMockExportDocuments(orderId));
     await assert.rejects(
-      () => agent.getQuote(preflight.preflightId, true),
+      () =>
+        agent.getQuote(
+          preflight.preflightId,
+          true,
+          powerOfAttorney(orderId),
+        ),
       /Customs broker quote is invalid/
     );
     assert.equal(quoteStore.size, 0);
@@ -1336,7 +1411,12 @@ test("quote errors include bounded response-body diagnostics", async () => {
   const orderId = "TEST-QUOTE-ERROR-DIAGNOSTIC";
   const preflight = agent.precheck(orderId, getMockExportDocuments(orderId));
   await assert.rejects(
-    () => agent.getQuote(preflight.preflightId, true),
+    () =>
+      agent.getQuote(
+        preflight.preflightId,
+        true,
+        powerOfAttorney(orderId),
+      ),
     error => {
       assert.match(error instanceof Error ? error.message : String(error), /Customs quote failed: 503/);
       assert.equal((error instanceof Error ? error.message : String(error)).includes("TAIL-MUST-NOT-LEAK"), false);
