@@ -39,7 +39,8 @@ export function SigningIdentityDialog({
               確認簽署人資訊
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              送出前請確認用於 vLEI 簽章的 LEI、簽署人與職稱（已預填 demo 預設值，可自行修改）。
+              送出前請確認用於 vLEI 簽章的 LEI、簽署人與職稱（已預填 demo
+              預設值，可自行修改）。
             </p>
           </div>
           <button
@@ -54,24 +55,42 @@ export function SigningIdentityDialog({
 
         <div className="space-y-3">
           <Field label="LEI">
-            <Input onChange={(event) => setLei(event.target.value)} value={lei} />
+            <Input
+              onChange={(event) => setLei(event.target.value)}
+              value={lei}
+            />
           </Field>
           <Field label="簽署人">
-            <Input onChange={(event) => setSigner(event.target.value)} value={signer} />
+            <Input
+              onChange={(event) => setSigner(event.target.value)}
+              value={signer}
+            />
           </Field>
           <Field label="職稱">
-            <Input onChange={(event) => setRole(event.target.value)} value={role} />
+            <Input
+              onChange={(event) => setRole(event.target.value)}
+              value={role}
+            />
           </Field>
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
-          <Button disabled={isSubmitting} onClick={onCancel} type="button" variant="outline">
+          <Button
+            disabled={isSubmitting}
+            onClick={onCancel}
+            type="button"
+            variant="outline"
+          >
             取消
           </Button>
           <Button
             disabled={isSubmitting || !canConfirm}
             onClick={() =>
-              onConfirm({ lei: lei.trim(), signer: signer.trim(), role: role.trim() })
+              onConfirm({
+                lei: lei.trim(),
+                signer: signer.trim(),
+                role: role.trim(),
+              })
             }
             type="button"
           >

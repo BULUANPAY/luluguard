@@ -51,7 +51,9 @@ function HydratingApp() {
     <main className="grid min-h-screen place-items-center px-6">
       <div className="text-center">
         <div className="mx-auto mb-4 size-2 animate-pulse rounded-full bg-primary" />
-        <p className="text-sm font-medium text-muted-foreground">正在準備本機 API 資料…</p>
+        <p className="text-sm font-medium text-muted-foreground">
+          正在準備出口商 demo…
+        </p>
       </div>
     </main>
   );

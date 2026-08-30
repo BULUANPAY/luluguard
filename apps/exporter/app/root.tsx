@@ -1,11 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-} from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 
 import "@luluguard/ui/globals.css";
 
@@ -45,8 +39,10 @@ export function HydrateFallback() {
         <div className="mx-auto mb-4 grid size-12 place-items-center rounded-2xl bg-primary font-display text-lg font-bold text-primary-foreground">
           LG
         </div>
-        <p className="font-display text-lg font-semibold">LuLuGuard 正在準備工作區</p>
-        <p className="mt-1 text-sm text-muted-foreground">載入公司與貨件資料…</p>
+        <p className="font-display text-lg font-semibold">
+          LuLuGuard 正在準備簽署頁面
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">載入出口商資料…</p>
       </div>
     </main>
   );

@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@source "../../../../apps/portal/app";
+@source "../../../../apps/exporter/app";
 
 @theme inline {
   --color-background: var(--background);
@@ -43,7 +43,11 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(circle at 85% 0%, rgb(225 238 230 / 70%), transparent 30rem),
+    radial-gradient(
+      circle at 85% 0%,
+      rgb(225 238 230 / 70%),
+      transparent 30rem
+    ),
     var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);

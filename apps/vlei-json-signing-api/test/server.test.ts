@@ -49,7 +49,7 @@ test("rejects an oversized chunked request", async () => {
   );
 });
 
-test("restricts browser access to the portal origin by default", () => {
+test("restricts browser access to the exporter origin by default", () => {
   const previousOrigin = process.env.VLEI_SIGNING_ALLOWED_ORIGIN;
   delete process.env.VLEI_SIGNING_ALLOWED_ORIGIN;
   try {
@@ -57,10 +57,10 @@ test("restricts browser access to the portal origin by default", () => {
       corsHeaders()["access-control-allow-origin"],
       DEFAULT_ALLOWED_ORIGIN,
     );
-    process.env.VLEI_SIGNING_ALLOWED_ORIGIN = "https://portal.example";
+    process.env.VLEI_SIGNING_ALLOWED_ORIGIN = "https://exporter.example";
     assert.equal(
       corsHeaders()["access-control-allow-origin"],
-      "https://portal.example",
+      "https://exporter.example",
     );
   } finally {
     if (previousOrigin === undefined)

@@ -14,9 +14,7 @@ export function buildSignedResponseFileName(
   return `${organization}_${documentType}_${date}.json`;
 }
 
-export function downloadSignedResponse(
-  envelope: SignedExportDocumentEnvelope,
-) {
+export function downloadSignedResponse(envelope: SignedExportDocumentEnvelope) {
   const blob = new Blob([JSON.stringify(envelope, null, 2)], {
     type: "application/json;charset=utf-8",
   });

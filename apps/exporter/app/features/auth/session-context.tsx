@@ -1,12 +1,6 @@
 import { useGetSession, type Session } from "@luluguard/api-client";
 import { PERMISSIONS, type Permission } from "@luluguard/shared";
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 interface AppSession extends Omit<Session, "permissions"> {
   permissions: Permission[];
@@ -14,42 +8,44 @@ interface AppSession extends Omit<Session, "permissions"> {
 
 interface SessionContextValue {
   session: AppSession;
-  switchOrganization: (organizationId: string) => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const { data, isPending, isError } = useGetSession();
-  const [activeOrganizationId, setActiveOrganizationId] = useState<string>();
 
   const value = useMemo<SessionContextValue | null>(() => {
     if (!data) return null;
 
     const activeOrganization =
-      data.organizations.find(({ id }) => id === activeOrganizationId) ??
-      data.activeOrganization;
+      data.activeOrganization.kind === "exporter"
+        ? data.activeOrganization
+        : data.organizations.find(({ kind }) => kind === "exporter");
+
+    if (!activeOrganization) return null;
 
     return {
       session: {
         ...data,
         activeOrganization,
+        organizations: [activeOrganization],
         permissions: data.permissions.filter(isPermission),
       },
-      // Replace this local switch with a session mutation when the backend is ready.
-      switchOrganization: setActiveOrganizationId,
     };
-  }, [activeOrganizationId, data]);
+  }, [data]);
 
   if (isPending) {
     return <SessionState message="正在載入公司與權限…" />;
   }
 
   if (isError || !value) {
-    return <SessionState message="無法取得登入資訊，請稍後再試。" />;
+    return <SessionState message="無法取得出口商登入資訊，請稍後再試。" />;
   }
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  );
 }
 
 export function useSession() {

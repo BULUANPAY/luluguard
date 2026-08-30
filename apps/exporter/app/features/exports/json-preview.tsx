@@ -4,7 +4,7 @@ import { useState } from "react";
 
 export function JsonPreview({
   payload,
-  fileName = "export-object.json",
+  fileName = "export-document.json",
   reference,
 }: {
   payload?: unknown;

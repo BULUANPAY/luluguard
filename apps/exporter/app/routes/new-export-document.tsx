@@ -7,16 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@luluguard/ui/components/card";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Download,
-  FileText,
-  LockKeyhole,
-  ShieldCheck,
-} from "lucide-react";
+import { CheckCircle2, Download, FileText, ShieldCheck } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router";
 
 import { useSession } from "../features/auth/session-context";
 import { JsonPreview } from "../features/exports/json-preview";
@@ -37,7 +29,7 @@ import {
 import { SigningIdentityDialog } from "../features/export-documents/signing-identity-dialog";
 
 export function meta() {
-  return [{ title: "產生出口文件｜LuLuGuard" }];
+  return [{ title: "簽署出口文件｜LuLuGuard" }];
 }
 
 type SubmitState = "idle" | "submitting" | "success" | "error";
@@ -45,15 +37,39 @@ type SubmitState = "idle" | "submitting" | "success" | "error";
 export default function NewExportDocumentRoute() {
   const { session } = useSession();
 
-  if (session.activeOrganization.kind !== "exporter") {
-    return <ExporterOnly />;
-  }
-
   return (
-    <ExportDocumentWorkspace
-      exporterCompany={session.activeOrganization.name}
-      key={session.activeOrganization.id}
-    />
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border/80 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-[1564px] items-center justify-between gap-4 px-5 py-4 lg:px-8">
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 place-items-center rounded-xl bg-[#d9f99d] text-sm font-black text-[#173c34]">
+              LG
+            </span>
+            <span>
+              <span className="block font-display text-base font-bold tracking-tight">
+                LuLuGuard
+              </span>
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                Exporter signing demo
+              </span>
+            </span>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-semibold">
+              {session.activeOrganization.name}
+            </p>
+            <p className="text-xs text-muted-foreground">{session.user.name}</p>
+          </div>
+        </div>
+      </header>
+
+      <main className="px-5 py-6 lg:px-8 lg:py-8">
+        <ExportDocumentWorkspace
+          exporterCompany={session.activeOrganization.name}
+          key={session.activeOrganization.id}
+        />
+      </main>
+    </div>
   );
 }
 
@@ -104,21 +120,13 @@ function ExportDocumentWorkspace({
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
-      <Link
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground"
-        to="/"
-      >
-        <ArrowLeft className="size-4" />
-        返回總覽
-      </Link>
-
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Badge className="border-primary/15 bg-primary/5 text-primary">
             出口商專用
           </Badge>
           <h1 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-            產生出口文件
+            填寫並簽署出口文件
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             在左側填寫固定格式的 I/V、P/L 或 DPP，右側會即時產生
@@ -296,28 +304,6 @@ function ResultItem({ label, value }: { label: string; value: string }) {
       <dd className="mt-0.5 truncate font-mono" title={value}>
         {value}
       </dd>
-    </div>
-  );
-}
-
-function ExporterOnly() {
-  return (
-    <div className="grid min-h-[60vh] place-items-center text-center">
-      <div className="max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
-        <LockKeyhole className="mx-auto size-9 text-muted-foreground" />
-        <h1 className="mt-4 font-display text-xl font-bold">
-          此功能僅供出口商使用
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          請先從右上角公司選單切換到出口商，再產生 I/V、P/L 或 DPP 文件。
-        </p>
-        <Link
-          className="mt-5 inline-flex text-sm font-semibold text-primary hover:underline"
-          to="/"
-        >
-          返回總覽
-        </Link>
-      </div>
     </div>
   );
 }

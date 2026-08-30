@@ -4,7 +4,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dev:portal": "pnpm --filter @luluguard/portal dev",
+    "dev:exporter": "pnpm --filter @luluguard/exporter dev",
     "dev:vlei-signing-api": "pnpm --filter @repo/vlei-json-signing-api dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
