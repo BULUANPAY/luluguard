@@ -130,7 +130,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
                 <Can permission="document:upload">
                   <Button onClick={() => navigate("/exports/documents/new")}>
                     <FileInput className="size-4" />
-                    <span className="hidden sm:inline">產生 I/V、P/L</span>
+                    <span className="hidden sm:inline">填寫並簽署文件</span>
                     <span className="sm:hidden">文件</span>
                   </Button>
                 </Can>

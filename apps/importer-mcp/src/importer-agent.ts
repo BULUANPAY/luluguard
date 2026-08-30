@@ -468,7 +468,11 @@ export class ImporterAgent {
       {
         method: "POST",
         url: declarationUrl,
-        body: { quoteId, documents },
+        body: {
+          quoteId,
+          documents,
+          documentReview: reviewedQuote.documentReview,
+        },
         paymentPolicyDecision,
       },
       paymentAttemptId,
@@ -480,7 +484,11 @@ export class ImporterAgent {
           "content-type": "application/json",
           "x-audit-trace-id": this.traceId,
         },
-        body: JSON.stringify({ quoteId, documents }),
+        body: JSON.stringify({
+          quoteId,
+          documents,
+          documentReview: reviewedQuote.documentReview,
+        }),
       });
     } catch (error) {
       log("error", "payment-audit", "payment.transport_failed", {

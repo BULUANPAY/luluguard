@@ -62,6 +62,24 @@ describe("export document helpers", () => {
     );
   });
 
+  it("loads a verifiable low-carbon DPP example", () => {
+    const document = createTestExportDocument(
+      "DIGITAL_PRODUCT_PASSPORT",
+      "Sinclair Livestock Exports Ltd.",
+    );
+
+    if (document.document_type !== "DIGITAL_PRODUCT_PASSPORT")
+      throw new Error("unexpected type");
+    expect(document.dpp_id).toBe("DPP-UNICORN-SCO-20260829-001");
+    expect(document.product.batch_id).toBe(document.dpp_id);
+    expect(document.product.quantity).toBe(10000);
+    expect(document.carbon_footprint.reduction_percent).toBe(28);
+    expect(document.carbon_footprint.product_carbon_footprint_kg_co2e).toBe(
+      document.carbon_footprint.baseline_kg_co2e * 0.72,
+    );
+    expect(parseExportDocument(JSON.stringify(document))).toEqual(document);
+  });
+
   it("rejects JSON whose type does not match the selected generator", () => {
     const document = createTestExportDocument(
       "PACKING_LIST",
@@ -87,7 +105,9 @@ describe("export document helpers", () => {
       "COMMERCIAL_INVOICE",
       "Sinclair Livestock Exports Ltd.",
     );
-    const missingShipment = structuredClone(document) as Partial<typeof document>;
+    const missingShipment = structuredClone(document) as Partial<
+      typeof document
+    >;
     delete missingShipment.shipment;
 
     expect(() => parseExportDocument(JSON.stringify(missingShipment))).toThrow(

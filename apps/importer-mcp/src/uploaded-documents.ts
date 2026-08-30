@@ -1,5 +1,6 @@
 import type {
   ExportDocuments,
+  DigitalProductPassportData,
   TradeDocumentType,
   TradeItem,
 } from "./domain.js";
@@ -49,6 +50,7 @@ function documentType(
     "bill_of_lading",
     "certificate_of_origin",
     "product_specification",
+    "digital_product_passport",
     "import_permit",
   ].includes(candidate)
     ? (candidate as TradeDocumentType)
@@ -80,6 +82,9 @@ export function buildExportDocuments(files: OrderFile[]): ExportDocuments {
     (item) => item.type === "certificate_of_origin",
   )?.content;
   const permit = parsed.find((item) => item.type === "import_permit")?.content;
+  const dpp = parsed.find(
+    (item) => item.type === "digital_product_passport",
+  )?.content;
   const exporter = object(invoice?.exporter);
   const importer = object(invoice?.importer);
   const shipment = object(invoice?.shipment);
@@ -107,6 +112,7 @@ export function buildExportDocuments(files: OrderFile[]): ExportDocuments {
             unitPriceUsd:
               number(item.unitPriceUsd) ?? number(item.unit_price) ?? 0,
             hsCode: text(item.hsCode) ?? text(item.hs_code),
+            dppBatchId: text(item.dppBatchId) ?? text(item.dpp_batch_id),
           },
         ];
       })
@@ -119,6 +125,42 @@ export function buildExportDocuments(files: OrderFile[]): ExportDocuments {
   const types = [
     ...new Set(parsed.flatMap((item) => (item.type ? [item.type] : []))),
   ];
+  const dppProduct = object(dpp?.product);
+  const dppCarbonFootprint = object(dpp?.carbon_footprint);
+  const dppValidity = object(dpp?.validity);
+  const digitalProductPassport: DigitalProductPassportData | undefined = dpp
+    ? {
+        documentId: text(dpp.document_id) ?? "",
+        dppId: text(dpp.dpp_id) ?? "",
+        product: {
+          name: text(dppProduct?.name) ?? "",
+          model: text(dppProduct?.model) ?? "",
+          hsCode: text(dppProduct?.hs_code) ?? "",
+          batchId: text(dppProduct?.batch_id) ?? "",
+          quantity: number(dppProduct?.quantity) ?? 0,
+          unit: text(dppProduct?.unit) ?? "",
+        },
+        carbonFootprint: {
+          productCarbonFootprintKgCo2e:
+            number(dppCarbonFootprint?.product_carbon_footprint_kg_co2e) ??
+            Number.NaN,
+          baselineKgCo2e:
+            number(dppCarbonFootprint?.baseline_kg_co2e) ?? Number.NaN,
+          claimedReductionPercent:
+            number(dppCarbonFootprint?.reduction_percent) ?? Number.NaN,
+          methodology: text(dppCarbonFootprint?.methodology) ?? "",
+          systemBoundary: text(dppCarbonFootprint?.system_boundary) ?? "",
+          verificationStandard:
+            text(dppCarbonFootprint?.verification_standard) ?? "",
+          verifiedBy: text(dppCarbonFootprint?.verified_by) ?? "",
+          verifiedAt: text(dppCarbonFootprint?.verified_at) ?? "",
+        },
+        validity: {
+          validFrom: text(dppValidity?.valid_from) ?? "",
+          validUntil: text(dppValidity?.valid_until) ?? "",
+        },
+      }
+    : undefined;
 
   return {
     invoiceNumber:
@@ -151,6 +193,7 @@ export function buildExportDocuments(files: OrderFile[]): ExportDocuments {
       text(origin?.certificateOfOriginNumber) ?? text(origin?.document_id),
     importPermitNumber:
       text(permit?.importPermitNumber) ?? text(permit?.document_id),
+    digitalProductPassport,
     providedDocuments: types,
     items,
   };
