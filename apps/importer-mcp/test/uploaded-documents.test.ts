@@ -52,6 +52,27 @@ test("builds broker documents from every uploaded order file", () => {
   assert.equal(documents.packageCount, 2);
 });
 
+test("classifies documents from content in the unclassified upload inbox", () => {
+  const documents = buildExportDocuments([
+    file("unclassified", {
+      invoiceNumber: "INV-AI-1",
+      currency: "USD",
+      items: [{ description: "Goods", quantity: 1, unitPriceUsd: 25 }],
+    }),
+    file("unclassified", {
+      packages: { total_packages: 3 },
+      weight: { gross_weight_kg: 12 },
+    }),
+  ]);
+
+  assert.equal(documents.invoiceNumber, "INV-AI-1");
+  assert.deepEqual(documents.providedDocuments, [
+    "commercial_invoice",
+    "packing_list",
+  ]);
+  assert.equal(documents.packageCount, 3);
+});
+
 test("rejects orders without files and non-USD invoices", () => {
   assert.throws(() => buildExportDocuments([]), /No JSON documents/);
   assert.throws(

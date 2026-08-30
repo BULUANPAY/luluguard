@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, type ReactNode, useRef, useState } from "react";
-import documentTypes from "../example-document-types.json";
 
 type UploadResponse = {
   error?: string;
@@ -10,20 +9,18 @@ type UploadResponse = {
 
 export function DocumentUpload({ orderId }: { orderId: string }): ReactNode {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [documentType, setDocumentType] = useState(documentTypes[0]?.type ?? "");
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<UploadResponse>();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!documentType || files.length === 0) return;
+    if (files.length === 0) return;
 
     setUploading(true);
     setResult(undefined);
     const body = new FormData();
     body.set("orderId", orderId);
-    body.set("documentType", documentType);
     files.forEach(file => body.append("files", file));
 
     try {
@@ -48,16 +45,7 @@ export function DocumentUpload({ orderId }: { orderId: string }): ReactNode {
         <span>目前訂單：{orderId}</span>
       </div>
       <form className="upload-form" onSubmit={submit}>
-        <label>
-          文件類型
-          <select value={documentType} onChange={event => { setDocumentType(event.target.value); setResult(undefined); }}>
-            {documentTypes.map(document => (
-              <option key={document.type} value={document.type}>
-                {document.label}{document.providedByExporter ? "（出口商提供）" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+        <p>不需要選擇文件類型，AI Agent 會依文件內容判斷。</p>
         <label className="file-picker">
           JSON 檔案（最多 20 個，每個 5 MB）
           <input ref={inputRef} type="file" accept="application/json,.json" multiple required
@@ -68,7 +56,7 @@ export function DocumentUpload({ orderId }: { orderId: string }): ReactNode {
             {files.map((file, index) => <li key={`${file.name}-${index}`}><span>{file.name}</span><small>{(file.size / 1024).toFixed(1)} KB</small></li>)}
           </ul>
         )}
-        <button disabled={uploading || !documentType || files.length === 0}>
+        <button disabled={uploading || files.length === 0}>
           {uploading ? "上傳中…" : `上傳 ${files.length || ""} 個檔案`}
         </button>
       </form>

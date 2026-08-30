@@ -24,6 +24,20 @@ test("returns parsed JSON files grouped by document type", async (t) => {
   assert.equal(files[0]?.path, "uploaded-files/ORD-1001/commercial_invoice/invoice-1.json");
 });
 
+test("returns unclassified JSON files stored directly under the order", async (t) => {
+  const root = await mkdtemp(path.join(tmpdir(), "luluguard-order-files-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const orderDirectory = path.join(root, "ORD-1001");
+  await mkdir(orderDirectory, { recursive: true });
+  await writeFile(path.join(orderDirectory, "invoice-1.json"), JSON.stringify({ document_type: "COMMERCIAL_INVOICE" }));
+
+  const files = await getOrderFiles(root, "ORD-1001");
+
+  assert.equal(files.length, 1);
+  assert.equal(files[0]?.documentType, "unclassified");
+  assert.equal(files[0]?.path, "uploaded-files/ORD-1001/invoice-1.json");
+});
+
 test("filters document types and returns an empty list for an unknown order", async (t) => {
   const root = await mkdtemp(path.join(tmpdir(), "luluguard-order-files-"));
   t.after(() => rm(root, { recursive: true, force: true }));

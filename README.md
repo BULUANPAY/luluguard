@@ -146,8 +146,8 @@ Expected response:
 The agent exposes four MCP tools. The read-only file tool is available throughout the workflow, while the remaining tools follow a fixed progression:
 
 1. `get_order_files`
-   - Reads uploaded JSON files for an order from `uploaded-files/<order-id>/<document-type>/`.
-   - Supports both built-in and custom document types without contacting the broker or making a payment.
+   - Reads uploaded JSON files for an order. New uploads enter `uploaded-files/<order-id>/` directly, and the agent determines their types from the content.
+   - Continues to read legacy type directories without contacting the broker or making a payment.
 2. `review_import_documents`
    - Reviews the mock documents selected in the Web UI.
    - Produces an independent importer estimate and a `preflightId`.

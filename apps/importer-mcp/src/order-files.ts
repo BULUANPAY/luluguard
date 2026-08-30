@@ -41,6 +41,32 @@ export async function getOrderFiles(
 
   const files: OrderFile[] = [];
   let totalSize = 0;
+  if (!requestedTypes || allowedTypes.has("unclassified")) {
+    for (const entry of availableTypes.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (!entry.isFile() || entry.isSymbolicLink() || entry.name.startsWith(".") || path.extname(entry.name).toLowerCase() !== ".json") continue;
+
+      const absolutePath = path.join(orderDirectory, entry.name);
+      const fileStat = await stat(absolutePath);
+      if (fileStat.size > MAX_FILE_SIZE) throw new Error(`${entry.name} exceeds the 5 MB file limit`);
+      totalSize += fileStat.size;
+      if (totalSize > MAX_TOTAL_SIZE) throw new Error("Order files exceed the 20 MB total read limit");
+
+      const text = await readFile(absolutePath, "utf8");
+      let content: unknown;
+      try {
+        content = JSON.parse(text);
+      } catch {
+        throw new Error(`${entry.name} contains invalid JSON`);
+      }
+      files.push({
+        documentType: "unclassified",
+        filename: entry.name,
+        path: path.posix.join("uploaded-files", orderId, entry.name),
+        size: fileStat.size,
+        content
+      });
+    }
+  }
   for (const documentType of documentTypes) {
     const typeDirectory = path.join(orderDirectory, documentType);
     const entries = await readdir(typeDirectory, { withFileTypes: true });
