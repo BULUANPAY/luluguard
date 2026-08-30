@@ -43,7 +43,19 @@ function documentType(
   content: JsonObject,
 ): TradeDocumentType | undefined {
   const declared = text(content.document_type)?.toLowerCase();
-  const candidate = declared ?? file.documentType;
+  const storedType =
+    file.documentType === "unclassified" ? undefined : file.documentType;
+  const inferred =
+    Array.isArray(content.items) &&
+    (content.currency !== undefined ||
+      content.invoiceNumber !== undefined ||
+      content.document_id !== undefined)
+      ? "commercial_invoice"
+      : content.packages !== undefined || content.weight !== undefined
+        ? "packing_list"
+        : undefined;
+  const candidate = declared ?? storedType ?? inferred;
+  if (!candidate) return undefined;
   return [
     "commercial_invoice",
     "packing_list",

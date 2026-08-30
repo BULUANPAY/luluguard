@@ -63,7 +63,7 @@ function createServer(traceId = newAuditId("TRACE")) {
   server.registerTool(
     "get_order_files",
     {
-      description: "讀取指定訂單在 uploaded-files 內的 JSON 文件。可取得預設與自訂文件類型；此工具唯讀，不會聯絡報關行或付款。",
+      description: "讀取指定訂單在 uploaded-files 內的 JSON 文件。新上傳文件不預先分類，請依 JSON 內容判斷文件類型；此工具唯讀，不會聯絡報關行或付款。",
       inputSchema: {
         orderId: z.string().min(1).describe("要讀取文件的訂單編號"),
         documentTypes: z.array(z.string().min(1)).optional().describe("選填；只回傳指定文件類型，省略時回傳訂單的全部文件")

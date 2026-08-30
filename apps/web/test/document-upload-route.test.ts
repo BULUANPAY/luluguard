@@ -18,7 +18,6 @@ function uploadRequest(formData: FormData, token?: string) {
 test("rejects anonymous document uploads", async () => {
   const formData = new FormData();
   formData.set("orderId", "ORDER-1");
-  formData.set("documentType", "commercial_invoice");
 
   const response = await POST(uploadRequest(formData));
 
@@ -32,7 +31,6 @@ test("continues input validation for an authenticated upload", async () => {
   const { token } = createSandboxSession(employee);
   const formData = new FormData();
   formData.set("orderId", "../unsafe");
-  formData.set("documentType", "commercial_invoice");
 
   const response = await POST(uploadRequest(formData, token));
 
