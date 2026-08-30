@@ -21,6 +21,7 @@ describe("export document helpers", () => {
       "Sinclair Livestock Exports Ltd.",
     );
     expect(document.document_id).toBe("");
+    expect(document.invoice_number).toBe("");
     expect(document.issue_date).toBe("");
     expect(document.items[0]?.description).toBe("");
     expect(document.totals.total_amount).toBe(0);
@@ -35,7 +36,7 @@ describe("export document helpers", () => {
     expect(document.document_type).toBe("PACKING_LIST");
     if (document.document_type !== "PACKING_LIST")
       throw new Error("unexpected type");
-    expect(document.related_invoice).toMatch(/^INV-UNI-/);
+    expect(document.related_invoice).toBe("INV-DEMO-20260829-001");
     expect(document.exporter.region).toBe("Scotland");
     expect(document.importer.country).toBe("Taiwan");
     expect(document.cargo[0]?.description).toBe("Unicorn");
@@ -71,6 +72,7 @@ describe("export document helpers", () => {
 
     if (document.document_type !== "COMMERCIAL_INVOICE")
       throw new Error("unexpected type");
+    expect(document.invoice_number).toBe("INV-DEMO-20260829-001");
     expect(document.items[0]?.description).toBe("Unicorn");
     expect(document.items[0]?.quantity).toBe(10000);
     expect(document.items[0]?.unit).toBe("HEAD");
@@ -79,6 +81,29 @@ describe("export document helpers", () => {
       document.items[0]!.quantity * document.items[0]!.unit_price,
     );
   });
+
+  it.each(["UNICORN", "UFO"] as const)(
+    "links %s invoice and packing list with one shared demo invoice number",
+    (dataSet) => {
+      const invoice = createTestExportDocument(
+        "COMMERCIAL_INVOICE",
+        "Sinclair Livestock Exports Ltd.",
+        dataSet,
+      );
+      const packingList = createTestExportDocument(
+        "PACKING_LIST",
+        "Sinclair Livestock Exports Ltd.",
+        dataSet,
+      );
+
+      if (invoice.document_type !== "COMMERCIAL_INVOICE")
+        throw new Error("unexpected invoice type");
+      if (packingList.document_type !== "PACKING_LIST")
+        throw new Error("unexpected packing-list type");
+      expect(invoice.invoice_number).toBe("INV-DEMO-20260829-001");
+      expect(packingList.related_invoice).toBe(invoice.invoice_number);
+    },
+  );
 
   it("loads a verifiable low-carbon DPP example", () => {
     const document = createTestExportDocument(

@@ -54,6 +54,7 @@ interface ExportDocumentBase {
 
 export interface CommercialInvoice extends ExportDocumentBase {
   document_type: "COMMERCIAL_INVOICE";
+  invoice_number: string;
   currency: "USD" | "GBP";
   shipment: ShipmentDetails & { incoterm: string };
   items: Array<{
@@ -185,6 +186,7 @@ const documentBaseSchema = z
   .passthrough();
 const invoiceSchema = documentBaseSchema.extend({
   document_type: z.literal("COMMERCIAL_INVOICE"),
+  invoice_number: z.string(),
   currency: z.enum(["USD", "GBP"]),
   shipment: shipmentSchema.extend({ incoterm: z.string() }),
   items: z
@@ -290,6 +292,8 @@ const DEMO_METADATA: DemoMetadata = {
   warning: "FICTIONAL DEMO DATA — NOT A REAL TRADE DOCUMENT",
 };
 
+const DEMO_INVOICE_NUMBER = "INV-DEMO-20260829-001";
+
 export function createEmptyExportDocument(
   documentType: ExportDocumentType,
   exporterName: string,
@@ -336,6 +340,7 @@ export function createEmptyExportDocument(
     return {
       ...common,
       document_type: "COMMERCIAL_INVOICE",
+      invoice_number: "",
       currency: "USD",
       shipment: { ...common.shipment, incoterm: "" },
       items: [
@@ -468,6 +473,7 @@ export function createTestExportDocument(
     return {
       ...common,
       document_type: "COMMERCIAL_INVOICE",
+      invoice_number: DEMO_INVOICE_NUMBER,
       currency: "USD",
       shipment: { ...common.shipment, incoterm: "CIF Kaohsiung" },
       items: [
@@ -529,9 +535,7 @@ export function createTestExportDocument(
   return {
     ...common,
     document_type: "PACKING_LIST",
-    related_invoice: isUfo
-      ? "INV-UFO-20260829-001"
-      : "INV-UNI-20260829-001",
+    related_invoice: DEMO_INVOICE_NUMBER,
     packages: {
       package_type: isUfo
         ? "Anti-gravity Transport Cradle"

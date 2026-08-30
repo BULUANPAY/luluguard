@@ -153,6 +153,14 @@ function InvoiceFields({
   return (
     <>
       <Section title="發票項目">
+        <TextField
+          label="發票號碼"
+          onChange={(value) =>
+            updateInvoice(update, (draft) => (draft.invoice_number = value))
+          }
+          required
+          value={document.invoice_number}
+        />
         <SelectField
           label="幣別"
           onChange={(value) =>
