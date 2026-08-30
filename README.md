@@ -21,7 +21,7 @@ LuLuGuard 是一個可實際操作的進口商 AI Agent POC。它將「讀取貿
 
 | 驗收項目                        | 判定       | 說明                                                                                                 |
 | ------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
-| 可運作 POC 與六項信任機制       | 符合       | 有實際 UI、MCP、customs broker、x402 flow、server-side blockers、audit 及自動測試，不是純 mockup     |
+| 可運作 POC 與六項治理問題       | 符合       | 有實際 UI、MCP、customs broker、x402 flow、server-side blockers、audit 及自動測試，不是純 mockup     |
 | Repository                      | 符合       | 已提供 repository 連結；提交前仍須以無痕視窗確認評審可直接存取                                       |
 | README                          | 符合       | 包含安裝、啟動、展示、第三方套件、測試資料及 POC 限制                                                |
 | Demo Day 簡報                   | **尚缺**   | 尚未提供可公開開啟的簡報連結；必須包含一頁「治理／信任設計說明」                                     |
@@ -40,18 +40,22 @@ LuLuGuard 是一個可實際操作的進口商 AI Agent POC。它將「讀取貿
 6. x402 支付受 allowlist、單筆上限、24 小時累計、每小時次數、人工核准門檻與 kill switch 約束。
 7. Web 與 MCP 服務以相同 `traceId` 記錄雜湊鏈稽核事件，並對密鑰、token 與付款簽章等敏感欄位遮罩。
 
-## 六項治理／信任機制
+## BEFORE LULUGUARD ACTS
+
+每一次會讀取訂單、對外傳送文件、詢價或付款的 Agent 行動，都必須先回答六個治理問題。一般對話不會取得受控 workflow tool；一旦進入預檢、詢價或付款，以下控制會由 Web 與 MCP server 共同強制執行，而不是只靠 prompt 約束。
 
 此表可直接作為 Demo Day 簡報中「治理／信任設計說明」頁的內容來源。
 
-| #   | 信任機制                 | 實際控制                                                                                                                                          | Demo 現場如何證明                                                                    |
-| --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| 1   | 可驗證的組織與人員身分   | 員工 session 綁定 tenant、LEI、員工與角色；每次受控動作另外簽發 vLEI Agent Authorization                                                          | 分別登入 Alice 與 Bob，畫面顯示組織、LEI、角色及可用動作                             |
-| 2   | 最小權限與可驗證委任     | 授權綁定 `agentId`、版本、action、resource、`traceId`、有效期限與 nonce；MCP 端驗章、比對可信 root AID／LEI，並拒絕跨動作、跨資源、過期或重放授權 | Bob 可預檢與詢價但不能付款；成功動作會顯示 Authorization ID、Signer AID              |
-| 3   | 資料完整性與合規前置檢查 | 預檢自動驗證 vLEI envelope、可信 root AID 及依文件提供方決定的 exporter／importer LEI；並阻擋缺件、欄位矛盾、無效 DPP、產品／批次或碳計算不一致   | 用錯誤 LEI 簽署出口文件，或把 DPP 減量百分比改錯；系統會說明原因並在傳送報關行前阻擋 |
-| 4   | 分階段揭露與人類決策點   | 固定流程為預檢 → 確認估價並閱讀／同意報關委任書 → 詢價 → 明確核准付款；委任只涵蓋本訂單的傳檔與詢價，不包含付款，報價有時效且只能成功使用一次     | 預檢時尚未聯絡報關行；未接受委任書不能傳檔詢價，未另行核准付款不能送件               |
-| 5   | 可程式化的資金治理       | x402 支付前重新檢查 Agent 狀態、收款 allowlist、單筆／日／時限額、人工核准門檻、報價與 compliance blocker；可選 private key 或 AWS KMS signer     | 在 Policy 頁按「暫停所有付款」後嘗試支付會被拒絕；恢復 `ACTIVE` 後才可依政策執行     |
-| 6   | 全鏈路可歸責與可稽核性   | Web、模型工具決策、MCP、政策判斷、broker 與付款事件以 `traceId` 串接；JSONL 使用 `previousHash`／`hash` 形成防竄改雜湊鏈，並遮罩敏感資料          | 完成一輪操作後執行 `pnpm audit:verify`，再用同一 `traceId` 對照兩個 audit log        |
+| #   | 構面                | 提問                     | 對應機制             | LuLuGuard 程式落地與 Demo 證明                                                                                                                           |
+| --- | ------------------- | ------------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Principal           | 代表誰？                 | vLEI 身分與角色驗證  | Session 綁定 tenant、員工、組織 LEI 與角色；受控動作另有 vLEI Agent Authorization。分別登入 Alice／Bob，展示身分及付款權限差異                           |
+| 2   | Authorization       | 被授權做什麼？           | 委任範圍與權限憑證   | 簽章授權綁定 agent、action、resource、`traceId` 與訂單；詢價另需閱讀並接受只涵蓋傳檔／詢價的報關委任書。未同意委任或跨 action／resource 使用會被拒絕     |
+| 3   | Tool / Action       | 可以執行哪些動作？       | 工具與資料存取控制   | 每個 workflow stage 只有專屬 tool allowlist；server 重新綁定 `orderId`、`preflightId`、`quoteId` 與 approval，受控 tool 每次 Agent run 只能呼叫一次      |
+| 4   | Policy Gate         | 哪些高風險動作必須阻擋？ | 規則、門檻與人工核准 | 文件／DPP／報價 compliance gate，加上 payee allowlist、單筆／日／時限額、人工核准門檻及 `PAYMENT_PAUSED`／`DISABLED`。展示錯誤 DPP 或 kill switch 阻擋   |
+| 5   | Audit Log           | 如何證明做過什麼？       | 決策、文件與操作軌跡 | Web 與 MCP 以同一 `traceId` 記錄身分、模型決策、tool、policy、broker 與付款事件；JSONL 有 hash chain 且敏感值遮罩。執行 `pnpm audit:verify` 驗證         |
+| 6   | Expiry / Revocation | 何時失效或撤銷？         | 到期、撤權與即時停權 | Session 8 小時、Agent Authorization 10 分鐘且 nonce 單次、quote 預設 300 秒；角色不再授權即拒絕，管理員可即時暫停付款或停用 Agent。展示過期 quote 或停權 |
+
+> Sandbox vLEI proof 只保存簽章時的 TEL snapshot，尚未實作 production 的即時 credential revocation 查詢；目前的即時撤權由 session／角色檢查及 runtime policy kill switch 執行。
 
 主要實作位置：[`apps/web/lib/sandbox-auth.ts`](apps/web/lib/sandbox-auth.ts)、[`apps/web/lib/vlei-authorization.ts`](apps/web/lib/vlei-authorization.ts)、[`apps/web/lib/vlei-document-verification.ts`](apps/web/lib/vlei-document-verification.ts)、[`apps/web/app/components/letter-of-authorization.tsx`](apps/web/app/components/letter-of-authorization.tsx)、[`apps/importer-mcp/src/vlei-authorization.ts`](apps/importer-mcp/src/vlei-authorization.ts)、[`apps/importer-mcp/src/payment/policy.ts`](apps/importer-mcp/src/payment/policy.ts)、[`apps/importer-mcp/src/document-review.ts`](apps/importer-mcp/src/document-review.ts)、[`apps/customs-broker/src/app.ts`](apps/customs-broker/src/app.ts) 與 [`scripts/verify-audit-log.mjs`](scripts/verify-audit-log.mjs)。
 
