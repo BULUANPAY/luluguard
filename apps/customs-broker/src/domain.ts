@@ -76,6 +76,7 @@ export const TradeItemSchema = z.object({
   material: optionalItemText(256),
   intendedUse: optionalItemText(500),
   quantity: positiveInteger(MAX_QUANTITY),
+  unit: boundedText(64).optional(),
   unitPriceUsd: money,
   hsCode: z.string().trim().min(1).max(32).optional(),
   dppBatchId: boundedText(256).optional()
@@ -90,6 +91,21 @@ export const TradeItemSchema = z.object({
     });
   }
 });
+
+export const PackingListSchema = z.object({
+  relatedInvoice: boundedText(128).optional(),
+  exporter: boundedText(256).optional(),
+  importer: boundedText(256).optional(),
+  vessel: boundedText(256).optional(),
+  totalQuantity: positiveInteger(MAX_QUANTITY).optional(),
+  unit: boundedText(64).optional(),
+  cargo: z.array(z.object({
+    description: boundedText(500),
+    quantity: positiveInteger(MAX_QUANTITY),
+    unit: boundedText(64).optional(),
+    dppBatchId: boundedText(256).optional()
+  }).strict()).max(MAX_ITEMS)
+}).strict();
 
 export const DigitalProductPassportSchema = z.object({
   documentId: boundedText(256),
@@ -132,6 +148,7 @@ export const ExportDocumentsSchema = z.object({
   packageCount: positiveInteger(MAX_QUANTITY).optional(),
   grossWeightKg: z.number().finite().positive().max(MAX_MONEY_USD).optional(),
   netWeightKg: z.number().finite().positive().max(MAX_MONEY_USD).optional(),
+  packingList: PackingListSchema.optional(),
   billOfLadingNumber: z.string().trim().min(1).max(128).optional(),
   certificateOfOriginNumber: z.string().trim().min(1).max(128).optional(),
   importPermitNumber: z.string().trim().min(1).max(128).optional(),
