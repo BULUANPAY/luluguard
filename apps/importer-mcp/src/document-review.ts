@@ -22,7 +22,10 @@ export interface LowCarbonAssessment {
 
 export const LOW_CARBON_REDUCTION_THRESHOLD_PERCENT = 20;
 
-const requiredDocuments: TradeDocumentType[] = REQUIRED_TRADE_DOCUMENT_TYPES;
+const requiredDocuments: TradeDocumentType[] =
+  REQUIRED_TRADE_DOCUMENT_TYPES.filter(
+    (documentType) => documentType !== "power_of_attorney",
+  );
 
 function isPositive(value: number | undefined): value is number {
   return value !== undefined && Number.isFinite(value) && value > 0;

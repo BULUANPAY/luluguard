@@ -1,4 +1,7 @@
-import type { TradeDocumentType } from "@luluguard/shared";
+import type {
+  CustomsPowerOfAttorney,
+  TradeDocumentType,
+} from "@luluguard/shared";
 
 export type { TradeDocumentType };
 
@@ -58,6 +61,7 @@ export interface ExportDocuments {
   certificateOfOriginNumber?: string;
   importPermitNumber?: string;
   digitalProductPassport?: DigitalProductPassportData;
+  powerOfAttorney?: CustomsPowerOfAttorney;
   providedDocuments: TradeDocumentType[];
   items: TradeItem[];
 }

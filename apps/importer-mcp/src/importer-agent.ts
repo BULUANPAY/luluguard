@@ -4,6 +4,7 @@ import { decodePaymentResponseHeader } from "@x402/fetch";
 import type { SettleResponse } from "@x402/core/types";
 import { convertToTokenAmount, numberToDecimalString } from "@x402/core/utils";
 import { z } from "zod";
+import type { CustomsPowerOfAttorney } from "@luluguard/shared";
 import type {
   AgentPolicy,
   CustomsBrokerReceipt,
@@ -814,6 +815,7 @@ export class ImporterAgent {
   async getQuote(
     preflightId: string,
     estimateApproved: boolean,
+    powerOfAttorney: CustomsPowerOfAttorney,
   ): Promise<QuoteResult> {
     this.audit(
       "broker-quote.prepare",
@@ -853,12 +855,34 @@ export class ImporterAgent {
         "The user must confirm the independent estimate before documents are sent to the broker",
       );
     }
-    const { orderId, documents, documentReview, independentEstimate } =
+    const {
+      orderId,
+      documents: preflightDocuments,
+      documentReview,
+      independentEstimate,
+    } =
       preflight;
+    if (powerOfAttorney.orderId !== orderId) {
+      throw new Error("Power of attorney does not match the preflight order");
+    }
+    if (!Number.isFinite(Date.parse(powerOfAttorney.acceptedAt))) {
+      throw new Error("Power of attorney acceptance time is invalid");
+    }
+    const documents: ExportDocuments = {
+      ...preflightDocuments,
+      powerOfAttorney,
+      providedDocuments: [
+        ...new Set([
+          ...preflightDocuments.providedDocuments,
+          "power_of_attorney" as const,
+        ]),
+      ],
+    };
     this.validateDocuments(documents);
     const audit = [
       ...preflight.audit,
       "User confirmed the independent estimate",
+      `Attached signed power of attorney ${powerOfAttorney.documentId}`,
     ];
     log("info", "importer-agent", "broker_quote.started", {
       orderId,

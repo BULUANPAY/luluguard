@@ -7,7 +7,13 @@ type UploadResponse = {
   uploaded?: Array<{ originalName: string; path: string }>;
 };
 
-export function DocumentUpload({ orderId }: { orderId: string }): ReactNode {
+export function DocumentUpload({
+  orderId,
+  onUploaded,
+}: {
+  orderId: string;
+  onUploaded?: () => void;
+}): ReactNode {
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -30,6 +36,7 @@ export function DocumentUpload({ orderId }: { orderId: string }): ReactNode {
       if (response.ok) {
         setFiles([]);
         if (inputRef.current) inputRef.current.value = "";
+        onUploaded?.();
       }
     } catch {
       setResult({ error: "無法連線到上傳服務，請稍後再試。" });
@@ -41,7 +48,7 @@ export function DocumentUpload({ orderId }: { orderId: string }): ReactNode {
   return (
     <section className="upload-panel" aria-labelledby="upload-title">
       <div className="documents-heading">
-        <div><p className="section-kicker">JSON UPLOAD</p><h2 id="upload-title">上傳訂單文件</h2></div>
+        <div><p className="section-kicker">PREPARE DOCUMENTS</p><h2 id="upload-title">先上傳訂單文件</h2></div>
         <span>目前訂單：{orderId}</span>
       </div>
       <form className="upload-form" onSubmit={submit}>
@@ -57,7 +64,7 @@ export function DocumentUpload({ orderId }: { orderId: string }): ReactNode {
           </ul>
         )}
         <button disabled={uploading || files.length === 0}>
-          {uploading ? "上傳中…" : `上傳 ${files.length || ""} 個檔案`}
+          {uploading ? "上傳中…" : `上傳 ${files.length} 個檔案`}
         </button>
       </form>
       {result?.error && <p className="upload-result error" role="alert">{result.error}</p>}

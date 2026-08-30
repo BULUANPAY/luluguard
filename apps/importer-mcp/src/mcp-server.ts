@@ -26,6 +26,7 @@ import {
 } from "./vlei-authorization.js";
 import { getOrderFiles } from "./order-files.js";
 import { buildExportDocuments } from "./uploaded-documents.js";
+import type { CustomsPowerOfAttorney } from "@luluguard/shared";
 import { resolve } from "node:path";
 
 const uploadedFilesRoot = path.resolve(process.cwd(), "../..", "uploaded-files");
@@ -266,13 +267,16 @@ function createServer(
         estimateApproved: z
           .boolean()
           .describe("使用者是否已按下確認預估並詢價按鈕"),
+        powerOfAttorney: z
+          .record(z.unknown())
+          .describe("使用者同意後產生、隨訂單送交報關行的報關委任書"),
         authorization: z
           .record(z.unknown())
           .optional()
           .describe("Web 後端注入的 sandbox vLEI Agent Authorization"),
       },
     },
-    async ({ preflightId, estimateApproved, authorization }) => {
+    async ({ preflightId, estimateApproved, powerOfAttorney, authorization }) => {
       const toolCallId = newAuditId("MCP-CALL");
       writeAudit({
         traceId,
@@ -283,7 +287,11 @@ function createServer(
         actor: "ai-agent",
         data: {
           tool: "get_import_quote",
-          arguments: { preflightId, estimateApproved },
+          arguments: {
+            preflightId,
+            estimateApproved,
+            powerOfAttorneyDocumentId: powerOfAttorney.documentId,
+          },
         },
       });
       log("info", "mcp-server", "tool.called", {
@@ -301,7 +309,11 @@ function createServer(
         stores.policyStore.assertAgentEnabled();
         const result = await (
           await createAgent(false, identity)
-        ).getQuote(preflightId, estimateApproved);
+        ).getQuote(
+          preflightId,
+          estimateApproved,
+          powerOfAttorney as unknown as CustomsPowerOfAttorney,
+        );
         log("info", "mcp-server", "tool.completed", {
           tool: "get_import_quote",
           preflightId,

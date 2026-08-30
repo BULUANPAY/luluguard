@@ -34,6 +34,28 @@ const documents: ExportDocuments = {
   grossWeightKg: 18.4,
   netWeightKg: 15.2,
   billOfLadingNumber: "ONEYTYOLIVE",
+  powerOfAttorney: {
+    documentType: "power_of_attorney",
+    documentId: "LOA-LIVE-001",
+    version: "1.0",
+    orderId: "ORDER-LIVE-001",
+    acceptedAt: "2026-08-29T00:00:00.000Z",
+    importer: {
+      name: "Formosa Industrial Systems Co., Ltd.",
+      lei: "549300LIVETEST000001"
+    },
+    representative: {
+      employeeId: "EMP-LIVE-001",
+      name: "Live Test Importer",
+      role: "Import Operations Manager"
+    },
+    scope: ["Transmit order documents for customs quotation"],
+    vleiAuthorization: {
+      authorizationId: "AUTH-LIVE-001",
+      signerAid: "ELiveSignerAid",
+      signerCredentialSaid: "ELiveCredentialSaid"
+    }
+  },
   providedDocuments: [
     "commercial_invoice",
     "packing_list",

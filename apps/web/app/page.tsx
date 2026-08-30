@@ -1,5 +1,5 @@
 "use client";
-import { FormEvent, useEffect, useRef, useState, type JSX } from "react";
+import { FormEvent, useEffect, useState, type JSX } from "react";
 import { DocumentUpload } from "./components/document-upload";
 import { LetterOfAuthorization } from "./components/letter-of-authorization";
 import { MarkdownMessage } from "./components/markdown-message";
@@ -30,6 +30,7 @@ type VleiAuthorizationSummary = {
   authorizationId: string;
   signerAid: string;
   signerCredentialSaid: string;
+  powerOfAttorneyDocumentId?: string;
 };
 
 export default function Home(): JSX.Element {
@@ -55,9 +56,8 @@ export default function Home(): JSX.Element {
   const [authorizationOpen, setAuthorizationOpen] = useState(false);
   const [lastAuthorization, setLastAuthorization] =
     useState<VleiAuthorizationSummary>();
-  const brokerStepRef = useRef<HTMLSpanElement>(null);
-  const brokerActionRef = useRef<HTMLButtonElement>(null);
   const selectedOrder = exampleOrders.find((order) => order.orderId === orderId);
+  const currentStep = quoteId ? 3 : readyForBroker && preflightId ? 2 : 1;
 
   useEffect(() => {
     void fetch("/api/auth/session")
@@ -68,17 +68,6 @@ export default function Home(): JSX.Element {
       })
       .finally(() => setSessionLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (!readyForBroker || !preflightId || quoteId) return;
-
-    brokerStepRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center",
-    });
-    brokerActionRef.current?.focus({ preventScroll: true });
-  }, [preflightId, quoteId, readyForBroker]);
 
   async function login(event: FormEvent) {
     event.preventDefault();
@@ -119,14 +108,19 @@ export default function Home(): JSX.Element {
     setAuthorizationOpen(false);
   }
 
-  function confirmBrokerAuthorization() {
+  function confirmBrokerAuthorization(acceptedAt: string) {
     setAuthorizationOpen(false);
     void runWorkflow(
       "broker_quote",
       `我確認進口商預估，並已閱讀及同意訂單 ${orderId} 的報關作業委託書，授權將本訂單文件送交報關行詢價並比較差異。`,
+      { customsAuthorizationAcceptedAt: acceptedAt },
     );
   }
-  async function runWorkflow(action: WorkflowAction, userContent: string) {
+  async function runWorkflow(
+    action: WorkflowAction,
+    userContent: string,
+    options: { customsAuthorizationAcceptedAt?: string } = {},
+  ) {
     const nextMessages: ChatMessage[] = [
       ...messages,
       { role: "user", content: userContent },
@@ -144,6 +138,8 @@ export default function Home(): JSX.Element {
           orderId,
           preflightId,
           quoteId,
+          customsAuthorizationAcceptedAt:
+            options.customsAuthorizationAcceptedAt,
         }),
       });
       const data = (await response.json()) as {
@@ -157,6 +153,13 @@ export default function Home(): JSX.Element {
       if (data.workflow?.readyForBroker !== undefined)
         setReadyForBroker(data.workflow.readyForBroker);
       if (data.workflow?.quoteId) setQuoteId(data.workflow.quoteId);
+      if (
+        action === "precheck" &&
+        data.workflow?.preflightId &&
+        data.workflow.readyForBroker
+      ) {
+        setAuthorizationOpen(true);
+      }
       if (data.vleiAuthorization) setLastAuthorization(data.vleiAuthorization);
       setMessages((current) => [
         ...current,
@@ -249,6 +252,41 @@ export default function Home(): JSX.Element {
           先由進口商 AI
           獨立檢查與估價；你確認後才把文件傳給報關行詢價，付款則需再次明確核准。
         </p>
+        <nav className="workflow-progress" aria-label="進口報關工作進度">
+          {[
+            {
+              step: 1,
+              title: "AI 文件檢查與獨立估價",
+              detail: "檢查已上傳文件",
+            },
+            {
+              step: 2,
+              title: "閱讀並同意委託書",
+              detail: "附上 vLEI 委任紀錄",
+            },
+            {
+              step: 3,
+              title: "明確核准後付款",
+              detail: "確認報價與服務費",
+            },
+          ].map((item) => {
+            const state =
+              item.step < currentStep
+                ? "done"
+                : item.step === currentStep
+                  ? "active"
+                  : "pending";
+            return (
+              <div className={`workflow-progress-step ${state}`} key={item.step}>
+                <span>{state === "done" ? "✓" : item.step}</span>
+                <div>
+                  <strong>{item.title}</strong>
+                  <small>{item.detail}</small>
+                </div>
+              </div>
+            );
+          })}
+        </nav>
         <div className="employee-card">
           <div>
             <strong>{session.employee.name}</strong>
@@ -266,43 +304,50 @@ export default function Home(): JSX.Element {
             <strong>✓ vLEI Agent Authorization 已簽署並送交驗證</strong>
             <span>{lastAuthorization.authorizationId}</span>
             <small>Signer AID：{lastAuthorization.signerAid}</small>
+            {lastAuthorization.powerOfAttorneyDocumentId && (
+              <small>
+                委任書附件：{lastAuthorization.powerOfAttorneyDocumentId}
+              </small>
+            )}
           </div>
         )}
         <a className="admin-link" href="/admin/policy">
           開啟 Payment Policy 管理頁 →
         </a>
-        <section className="documents" aria-labelledby="documents-title">
-          <div className="documents-heading">
-            <div>
-              <p className="section-kicker">ORDER WORKFLOW</p>
-              <h2 id="documents-title">文件檢查與估價流程</h2>
-            </div>
+        <section className="order-context" aria-labelledby="order-context-title">
+          <div>
+            <p className="section-kicker">CURRENT ORDER</p>
+            <h2 id="order-context-title">選擇要處理的訂單</h2>
           </div>
           <label className="order-field" htmlFor="orderId">
             訂單編號
-            <select id="orderId" value={orderId} onChange={event => { setOrderId(event.target.value); resetPreflight(); }}>
-              {exampleOrders.map(order => (
+            <select
+              id="orderId"
+              value={orderId}
+              onChange={(event) => {
+                setOrderId(event.target.value);
+                resetPreflight();
+              }}
+            >
+              {exampleOrders.map((order) => (
                 <option key={order.orderId} value={order.orderId}>
                   {order.orderId} — {order.importer.name} ({order.importer.lei})
                 </option>
               ))}
             </select>
           </label>
-          <p className="document-note">
-            AI 會讀取此訂單目前已上傳的文件（見下方「上傳訂單文件」）進行檢查與獨立估價。變更訂單或上傳文件後，既有預檢會失效，必須重新由 AI 檢查。
-          </p>
-          <div className="workflow-status">
-            <span className={preflightId ? "done" : "active"}>
-              1. AI 文件檢查與獨立估價
-            </span>
-            <span
-              ref={brokerStepRef}
-              className={quoteId ? "done" : readyForBroker ? "active" : ""}
-            >
-              2. 閱讀並同意委託書
-            </span>
-            <span className={quoteId ? "active" : ""}>3. 明確核准後付款</span>
+        </section>
+        <DocumentUpload orderId={orderId} onUploaded={resetPreflight} />
+        <section className="documents" aria-labelledby="documents-title">
+          <div className="documents-heading">
+            <div>
+              <p className="section-kicker">STEP 1 · AI REVIEW</p>
+              <h2 id="documents-title">文件檢查與估價流程</h2>
+            </div>
           </div>
+          <p className="document-note">
+            AI 會讀取上方已上傳的訂單文件進行檢查與獨立估價。檢查通過後會自動進入 Step 2，開啟報關委任書供你閱讀與同意。
+          </p>
           <div className="workflow-actions">
             <button
               type="button"
@@ -318,7 +363,6 @@ export default function Home(): JSX.Element {
             </button>
             {readyForBroker && preflightId && !quoteId && (
               <button
-                ref={brokerActionRef}
                 type="button"
                 className="secondary"
                 disabled={loading}
@@ -351,7 +395,6 @@ export default function Home(): JSX.Element {
               )}
           </div>
         </section>
-        <DocumentUpload orderId={orderId} />
         <div className="conversation" aria-live="polite">
           {messages.map((item, index) => (
             <div

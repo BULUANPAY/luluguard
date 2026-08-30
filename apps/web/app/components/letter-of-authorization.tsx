@@ -15,7 +15,7 @@ type LetterOfAuthorizationProps = {
   signerName: string;
   signerRole: string;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (acceptedAt: string) => void;
 };
 
 export function LetterOfAuthorization({
@@ -81,7 +81,7 @@ export function LetterOfAuthorization({
           <div>
             <p className="section-kicker">CUSTOMS AUTHORIZATION</p>
             <h2 id="authorization-title" ref={titleRef} tabIndex={-1}>
-              報關作業委託書
+              報關委任書
             </h2>
             <p id="authorization-summary">
               請閱讀完整內容。你同意後，系統才會把本訂單文件提供給報關行。
@@ -193,9 +193,9 @@ export function LetterOfAuthorization({
             <button
               type="button"
               disabled={!accepted}
-              onClick={onConfirm}
+              onClick={() => onConfirm(new Date().toISOString())}
             >
-              同意並送交報關行
+              同意、附上委任書並送交報關行
             </button>
           </div>
         </footer>

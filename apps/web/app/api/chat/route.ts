@@ -11,7 +11,10 @@ import {
   parseWorkflowRequest,
   WorkflowRequestError,
 } from "../../../lib/workflow-request";
-import { TRADE_DOCUMENT_TYPES } from "@luluguard/shared";
+import {
+  TRADE_DOCUMENT_TYPES,
+  type CustomsPowerOfAttorney,
+} from "@luluguard/shared";
 import exampleOrders from "../../example-orders.json";
 
 export const runtime = "nodejs";
@@ -79,7 +82,11 @@ export async function POST(request: Request) {
       );
     }
     const body = parseWorkflowRequest(await request.json());
-        writeAudit({
+    const customsAuthorizationAcceptedAt =
+      body.workflowAction === "broker_quote"
+        ? new Date().toISOString()
+        : undefined;
+    writeAudit({
       traceId,
       spanId: requestId,
       component: "chat-api",
@@ -115,12 +122,53 @@ export async function POST(request: Request) {
                 workflowAction === "broker_quote"
                   ? body.estimateApproved
                   : undefined,
+              customsAuthorizationAcceptedAt:
+                workflowAction === "broker_quote"
+                  ? customsAuthorizationAcceptedAt
+                  : undefined,
               humanApproved:
                 workflowAction === "payment"
                   ? body.paymentApproved
                   : undefined,
             },
           });
+    const authorizationOrder = exampleOrders.find(
+      (candidate) => candidate.orderId === body.orderId,
+    );
+    const powerOfAttorney: CustomsPowerOfAttorney | undefined =
+      workflowAction === "broker_quote" &&
+      authorization &&
+      body.orderId &&
+      customsAuthorizationAcceptedAt &&
+      authorizationOrder
+        ? {
+            documentType: "power_of_attorney",
+            documentId: `LOA-${body.orderId}-${authorization.payload.authorizationId}`,
+            version: "1.0",
+            orderId: body.orderId,
+            acceptedAt: customsAuthorizationAcceptedAt,
+            importer: authorizationOrder.importer,
+            representative: {
+              employeeId: session.employee.id,
+              name: session.employee.name,
+              role: session.employee.role,
+            },
+            scope: [
+              "傳送本訂單文件給報關行",
+              "進行稅則與稅費初步檢核",
+              "取得報關服務報價",
+            ],
+            vleiAuthorization: {
+              authorizationId: authorization.payload.authorizationId,
+              signerAid: authorization.protected.signerAid,
+              signerCredentialSaid:
+                authorization.protected.signerCredentialSaid,
+            },
+          }
+        : undefined;
+    if (workflowAction === "broker_quote" && !powerOfAttorney) {
+      throw new WorkflowRequestError("無法建立本訂單的報關委任書");
+    }
     const answer = await withMcpClient(traceId, async (mcp) => withVleiVerifyMcpClient(async (vleiMcp) => {
       writeAudit({
         traceId,
@@ -212,6 +260,7 @@ export async function POST(request: Request) {
           if (name === "get_import_quote") {
             args.preflightId = body.preflightId;
             args.estimateApproved = body.estimateApproved;
+            args.powerOfAttorney = powerOfAttorney;
           }
           if (name === "submit_import_declaration") {
             args.orderId = body.orderId;
@@ -302,6 +351,7 @@ export async function POST(request: Request) {
             authorizationId: authorization.payload.authorizationId,
             signerAid: authorization.protected.signerAid,
             signerCredentialSaid: authorization.protected.signerCredentialSaid,
+            powerOfAttorneyDocumentId: powerOfAttorney?.documentId,
           }
         : undefined,
     });
