@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useRef, useState, type JSX } from "react";
 import { DocumentUpload } from "./components/document-upload";
+import { LetterOfAuthorization } from "./components/letter-of-authorization";
 import { MarkdownMessage } from "./components/markdown-message";
 import exampleOrders from "./example-orders.json";
 
@@ -51,10 +52,12 @@ export default function Home(): JSX.Element {
   const [preflightId, setPreflightId] = useState<string>();
   const [readyForBroker, setReadyForBroker] = useState(false);
   const [quoteId, setQuoteId] = useState<string>();
+  const [authorizationOpen, setAuthorizationOpen] = useState(false);
   const [lastAuthorization, setLastAuthorization] =
     useState<VleiAuthorizationSummary>();
   const brokerStepRef = useRef<HTMLSpanElement>(null);
   const brokerActionRef = useRef<HTMLButtonElement>(null);
+  const selectedOrder = exampleOrders.find((order) => order.orderId === orderId);
 
   useEffect(() => {
     void fetch("/api/auth/session")
@@ -113,6 +116,15 @@ export default function Home(): JSX.Element {
     setPreflightId(undefined);
     setReadyForBroker(false);
     setQuoteId(undefined);
+    setAuthorizationOpen(false);
+  }
+
+  function confirmBrokerAuthorization() {
+    setAuthorizationOpen(false);
+    void runWorkflow(
+      "broker_quote",
+      `我確認進口商預估，並已閱讀及同意訂單 ${orderId} 的報關作業委託書，授權將本訂單文件送交報關行詢價並比較差異。`,
+    );
   }
   async function runWorkflow(action: WorkflowAction, userContent: string) {
     const nextMessages: ChatMessage[] = [
@@ -287,7 +299,7 @@ export default function Home(): JSX.Element {
               ref={brokerStepRef}
               className={quoteId ? "done" : readyForBroker ? "active" : ""}
             >
-              2. 確認後向報關行詢價
+              2. 閱讀並同意委託書
             </span>
             <span className={quoteId ? "active" : ""}>3. 明確核准後付款</span>
           </div>
@@ -310,14 +322,9 @@ export default function Home(): JSX.Element {
                 type="button"
                 className="secondary"
                 disabled={loading}
-                onClick={() =>
-                  runWorkflow(
-                    "broker_quote",
-                    `我確認進口商預估，請將訂單 ${orderId} 的文件送給報關行詢價並比較差異。`,
-                  )
-                }
+                onClick={() => setAuthorizationOpen(true)}
               >
-                以 vLEI 授權向報關行詢價
+                閱讀並同意報關委託書
               </button>
             )}
             {quoteId && session.employee.allowedActions.includes("payment") && (
@@ -382,6 +389,15 @@ export default function Home(): JSX.Element {
           </button>
         </form>
       </section>
+      {authorizationOpen && (
+        <LetterOfAuthorization
+          order={selectedOrder}
+          signerName={session.employee.name}
+          signerRole={session.employee.role}
+          onClose={() => setAuthorizationOpen(false)}
+          onConfirm={confirmBrokerAuthorization}
+        />
+      )}
     </main>
   );
 }
