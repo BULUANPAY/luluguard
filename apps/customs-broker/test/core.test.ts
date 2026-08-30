@@ -111,6 +111,20 @@ function expectStoreError(code: QuoteStoreError["code"], callback: () => unknown
 
 test("validates money precision, integer quantities, and item-value overflow", () => {
   assert.equal(ExportDocumentsSchema.safeParse(documents).success, true);
+  const { material: _material, intendedUse: _intendedUse, ...itemWithoutEnrichment } =
+    documentItem;
+  assert.equal(QuoteRequestSchema.safeParse({
+    ...documents,
+    items: [itemWithoutEnrichment]
+  }).success, true);
+  assert.equal(QuoteRequestSchema.safeParse({
+    ...documents,
+    items: [{ ...documentItem, material: "", intendedUse: "" }]
+  }).success, true);
+  assert.equal(QuoteRequestSchema.safeParse({
+    ...documents,
+    items: [{ ...documentItem, material: "x".repeat(257) }]
+  }).success, false);
   assert.equal(ExportDocumentsSchema.safeParse({
     ...documents,
     freightUsd: 1.001
@@ -161,7 +175,34 @@ test("validates required document types, cross-field data, uniqueness, and stric
       "packing_list",
       "digital_product_passport",
       "power_of_attorney"
-    ]
+    ],
+    items: [{ ...documentItem, dppBatchId: "DPP-BATCH-001" }],
+    digitalProductPassport: {
+      documentId: "DOC-DPP-001",
+      dppId: "DPP-001",
+      product: {
+        name: "Widget",
+        model: "W-1",
+        hsCode: "84713000",
+        batchId: "DPP-BATCH-001",
+        quantity: 2,
+        unit: "UNIT"
+      },
+      carbonFootprint: {
+        productCarbonFootprintKgCo2e: 80,
+        baselineKgCo2e: 100,
+        claimedReductionPercent: 20,
+        methodology: "ISO 14067",
+        systemBoundary: "Cradle-to-port",
+        verificationStandard: "ISO 14064-3",
+        verifiedBy: "Verifier Ltd",
+        verifiedAt: "2026-08-28T09:00:00.000Z"
+      },
+      validity: {
+        validFrom: "2026-08-29",
+        validUntil: "2027-08-28"
+      }
+    }
   }).success, true);
   assert.equal(QuoteRequestSchema.safeParse({
     ...completeDocuments,
