@@ -1,3 +1,4 @@
+import { convertToTokenAmount, numberToDecimalString } from "@x402/core/utils";
 import type { DutyQuote, ExportDocuments } from "./domain.js";
 import { calculateImportCharges } from "./import-charges.js";
 
@@ -24,6 +25,33 @@ export interface ComplianceReview {
 }
 
 const centsEqual = (left: number, right: number) => Math.abs(left - right) <= 0.01;
+
+function usdcAtomicAmount(value: number): string | undefined {
+  if (!Number.isFinite(value) || value < 0) return undefined;
+  let decimal: string;
+  try {
+    decimal = numberToDecimalString(value);
+  } catch {
+    return undefined;
+  }
+  const fractionalPart = decimal.split(".")[1] ?? "";
+  if (/[1-9]/.test(fractionalPart.slice(6))) return undefined;
+  try {
+    return convertToTokenAmount(decimal, 6);
+  } catch {
+    return undefined;
+  }
+}
+
+function sumUsdcAtomicAmounts(values: number[]): string | undefined {
+  let total = 0n;
+  for (const value of values) {
+    const atomicAmount = usdcAtomicAmount(value);
+    if (atomicAmount === undefined) return undefined;
+    total += BigInt(atomicAmount);
+  }
+  return total.toString();
+}
 
 export function reviewImportQuote(
   documents: ExportDocuments,
@@ -85,7 +113,13 @@ export function reviewImportQuote(
       message: `Quoted customs value ${quote.customsValueUsd} does not match expected CIF value ${expected.customsValueUsd}.`
     });
   }
-  if (!centsEqual(quote.customsBrokerFeeUsd, expectedBrokerFeeUsd)) {
+  const quotedBrokerFeeAtomic = usdcAtomicAmount(quote.customsBrokerFeeUsd);
+  const expectedBrokerFeeAtomic = usdcAtomicAmount(expectedBrokerFeeUsd);
+  if (
+    quotedBrokerFeeAtomic === undefined ||
+    expectedBrokerFeeAtomic === undefined ||
+    quotedBrokerFeeAtomic !== expectedBrokerFeeAtomic
+  ) {
     findings.push({
       code: "BROKER_FEE_MISMATCH",
       severity: "blocker",
@@ -98,22 +132,28 @@ export function reviewImportQuote(
       message: `The quoted broker fee matches the configured x402 fee of ${expectedBrokerFeeUsd} USDC; this does not assess the market price of broker services.`
     });
   }
-  if (Date.parse(quote.expiresAt) <= Date.now()) {
+  const quoteExpiresAt = Date.parse(quote.expiresAt);
+  if (!Number.isFinite(quoteExpiresAt) || quoteExpiresAt <= Date.now()) {
     findings.push({
       code: "QUOTE_EXPIRED",
       severity: "blocker",
       message: "The broker quote has expired."
     });
   }
-  const expectedTotal = Number((
-    quote.dutyUsd + quote.taxUsd + quote.tradePromotionFeeUsd +
-    quote.filingFeeUsd + quote.customsBrokerFeeUsd
-  ).toFixed(2));
-  if (!centsEqual(quote.totalEstimatedUsd, expectedTotal)) {
+  const totalComponents = [
+    quote.dutyUsd,
+    quote.taxUsd,
+    quote.tradePromotionFeeUsd,
+    quote.filingFeeUsd,
+    quote.customsBrokerFeeUsd
+  ];
+  const quotedTotalAtomic = usdcAtomicAmount(quote.totalEstimatedUsd);
+  const expectedTotalAtomic = sumUsdcAtomicAmounts(totalComponents);
+  if (quotedTotalAtomic === undefined || expectedTotalAtomic === undefined || quotedTotalAtomic !== expectedTotalAtomic) {
     findings.push({
       code: "QUOTE_TOTAL_MISMATCH",
       severity: "blocker",
-      message: `Quoted total ${quote.totalEstimatedUsd} does not equal its fee components ${expectedTotal}.`
+      message: `Quoted total ${quote.totalEstimatedUsd} does not equal its fee components at USDC atomic precision.`
     });
   }
 

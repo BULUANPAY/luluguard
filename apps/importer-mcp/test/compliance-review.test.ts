@@ -31,6 +31,34 @@ test("blocks payment when broker fee does not match x402 configuration", () => {
   );
 });
 
+test("blocks a one-atomic-unit broker fee mismatch", () => {
+  const review = reviewImportQuote(
+    getMockExportDocuments("REVIEW"),
+    { ...validDutyQuote, customsBrokerFeeUsd: 0.010001 },
+    0.01,
+  );
+  assert.equal(review.paymentAllowed, false);
+  assert.ok(
+    review.findings.some(
+      (finding) => finding.code === "BROKER_FEE_MISMATCH",
+    ),
+  );
+});
+
+test("blocks a one-atomic-unit total mismatch", () => {
+  const review = reviewImportQuote(
+    getMockExportDocuments("REVIEW"),
+    { ...validDutyQuote, totalEstimatedUsd: 2_908.940001 },
+    0.01,
+  );
+  assert.equal(review.paymentAllowed, false);
+  assert.ok(
+    review.findings.some(
+      (finding) => finding.code === "QUOTE_TOTAL_MISMATCH",
+    ),
+  );
+});
+
 test("blocks payment when broker duty rate differs from local mock tariff profile", () => {
   const review = reviewImportQuote(
     getMockExportDocuments("REVIEW"),

@@ -2,6 +2,8 @@
 
 LuLuGuard 是一個可實際操作的進口商 AI Agent POC。它將「讀取貿易文件、文件預檢與獨立估價、向報關行詢價、人工核准、x402 支付與報關送件」拆成不可任意跳過的階段，並以 vLEI 身分授權、角色權限、執行期付款政策及可驗證稽核紀錄建立可展示的治理邊界。
 
+其中 customs broker app 以 x402 Seller / Resource Server 提供服務，使用 Base Sepolia USDC 與 x402 v2 `exact` scheme，並委由設定的 Facilitator 驗證與結算付款。
+
 > 本專案是競賽用 sandbox 原型，使用測試資料與 Base Sepolia 測試網。它不是正式報關、法律、稅務、碳盤查或投資建議系統。
 
 ## 交件入口
@@ -48,6 +50,7 @@ LuLuGuard 是一個可實際操作的進口商 AI Agent POC。它將「讀取貿
 ```text
 apps/
 ├── importer-mcp/          MCP server、進口流程、付款政策與 x402 signer
+├── customs-broker/        x402 Seller / Resource Server
 ├── exporter/              React Router 出口文件製作與簽章 Demo
 ├── vlei-json-signing-api/ 瀏覽器可呼叫的 JSON 簽章服務
 ├── vlei-json-signing-test/簽章及驗章 smoke tests
@@ -69,6 +72,7 @@ packages/
 | Exporter         | `http://localhost:5173`              | I/V、P/L、DPP 製作與 vLEI 簽章 |
 | vLEI signing API | `http://localhost:3001`              | JSON 簽章 HTTP API             |
 | Importer MCP     | `http://127.0.0.1:4020/mcp`          | Streamable HTTP MCP endpoint   |
+| Customs Broker   | `http://127.0.0.1:4021`              | x402 Seller / Resource Server   |
 | MCP health       | `http://127.0.0.1:4020/health`       | Importer MCP health check      |
 
 ## 執行需求
@@ -92,9 +96,12 @@ git submodule update --init --recursive
 pnpm install
 cp apps/importer-mcp/.env.example apps/importer-mcp/.env
 cp apps/web/.env.local.example apps/web/.env.local
+cp apps/customs-broker/.env.example apps/customs-broker/.env
 ```
 
 兩個產生的環境檔都已由 Git 忽略。所有 placeholder 必須在 Demo 前替換；Web 與 Importer MCP 的 `MCP_API_KEY` 必須完全相同。
+
+`apps/customs-broker/.env` 也已由 Git 忽略；Importer 與 customs broker 的 `CUSTOMS_BROKER_ADDRESS`、`CUSTOMS_BROKER_FEE_USDC` 與 `X402_NETWORK` 必須一致。
 
 ### Web 環境變數
 
@@ -152,6 +159,7 @@ pnpm dev
 Turborepo 會先 build Web 所依賴的 vLEI verifier MCP 與 JSON signing package。確認 Importer MCP 正常：
 
 ```sh
+curl http://127.0.0.1:4021/health
 curl http://127.0.0.1:4020/health
 ```
 
@@ -161,11 +169,32 @@ curl http://127.0.0.1:4020/health
 { "status": "ok", "service": "x402-importer-mcp" }
 ```
 
+### Customs Broker x402 flow
+
+Importer workflow 的三個 MCP tools 為 `review_import_documents`、`get_import_quote` 與 `submit_import_declaration`；前者先在本地檢查文件與估價，通過使用者確認後才向 customs broker 詢價，最後才以 x402 付款送件。
+
+Customs Broker 的 protected Seller flow 為：
+
+```text
+POST /customs/quotes
+→ 200 quote
+→ POST /customs/declarations
+→ 402 PAYMENT-REQUIRED
+→ retry with PAYMENT-SIGNATURE
+→ Facilitator verify
+→ prepare declaration
+→ Facilitator settle
+→ 200 + PAYMENT-RESPONSE + receipt
+```
+
+Declaration response 會等 settlement 成功後才回傳；verification 或 settlement 失敗時不會回傳成功的 filing receipt。
+
 也可以分別啟動：
 
 ```sh
 pnpm --filter @luluguard/importer-mcp dev
 pnpm --filter @luluguard/web dev
+pnpm --filter @luluguard/customs-broker dev
 ```
 
 ### 出口文件簽章 Demo
@@ -241,6 +270,8 @@ Agent 可因狀態、收款 allowlist、單筆上限、rolling 24-hour limit、�
 
 Web proxy 使用 `GET /admin/policy` 與 `PUT /admin/policy`。Policy、preflight、quote 與 payment history 目前存在記憶體，Importer MCP 重啟後會清除。
 
+若 dispatched payment 無法確認，Importer 會記錄 `ambiguous` 或 `pending` reconciliation 並阻擋自動重試；可用 policy-admin 保護的 `GET /admin/reconciliation/:quoteId` 與 `POST /admin/reconciliation/resolve` 查詢及處理。只有 operator 確認的 terminal failure 才能釋放付款，且 attempts、network、payer、amount 與已記錄的 transaction hash 必須相符。
+
 ## Audit log
 
 預設產生 append-only JSON Lines：
@@ -271,6 +302,12 @@ pnpm build
 
 ```sh
 pnpm --filter @luluguard/importer-mcp test
+```
+
+Customs Broker 測試預設離線執行；opt-in live smoke test 需要有資金的 Base Sepolia 測試錢包：
+
+```sh
+X402_LIVE_TEST=1 pnpm --filter @luluguard/customs-broker test
 ```
 
 測試涵蓋缺件與 DPP 錯誤阻擋、預估確認、報價效期、人工核准、支付限額、錯誤收款地址、並行重複付款、vLEI action／resource mismatch、過期與 nonce replay 等案例。測試中的 broker 與 paid fetch 是可重現的 stub；UI happy path 則使用環境變數指定的 broker API。
@@ -310,3 +347,5 @@ pnpm --filter @luluguard/web start
 - 本機 JSONL 可偵測鏈內竄改，但不是 WORM storage；production 應外送 SIEM／immutable storage、簽署 checkpoint 並建立 retention policy。
 - `uploaded-files` 是本機 POC 儲存；production 必須加入物件儲存、加密、惡意檔案掃描、tenant isolation、資料保留與刪除流程。
 - 完整付款依賴外部 broker 的 x402 相容性及測試網可用性；Demo 前應做 end-to-end 預演並準備真實操作錄影作為網路故障備援。
+- Customs quotes 與 declarations 是 mock 資料，不代表真實政府或報關整合；目前僅支援 Base Sepolia USDC 的 x402 v2 `exact` scheme。
+- Ambiguous settlement outcome 會 fail closed 並需要人工處理；replay protection、ownership lock 與 reconciliation 目前是 process-local。
