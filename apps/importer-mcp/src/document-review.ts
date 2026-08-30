@@ -15,6 +15,14 @@ const requiredDocuments: TradeDocumentType[] = [
   "bill_of_lading"
 ];
 
+function isPositive(value: number | undefined): value is number {
+  return value !== undefined && Number.isFinite(value) && value > 0;
+}
+
+function isNonNegative(value: number | undefined): value is number {
+  return value !== undefined && Number.isFinite(value) && value >= 0;
+}
+
 export function reviewDocumentsBeforeTransmission(documents: ExportDocuments): DocumentReview {
   const selected = new Set(documents.providedDocuments);
   const missingRequiredDocuments = requiredDocuments.filter(type => !selected.has(type));
@@ -30,25 +38,30 @@ export function reviewDocumentsBeforeTransmission(documents: ExportDocuments): D
     !documents.exporter ||
     !documents.importer ||
     !documents.incoterm ||
-    documents.freightUsd === undefined ||
-    documents.insuranceUsd === undefined ||
-    !documents.items.length
+    !isNonNegative(documents.freightUsd) ||
+    !isNonNegative(documents.insuranceUsd) ||
+    !documents.items.length ||
+    documents.items.some(
+      (item) =>
+        !isPositive(item.quantity) || !isNonNegative(item.unitPriceUsd),
+    )
   )) {
     findings.push({
       code: "COMMERCIAL_INVOICE_INCOMPLETE",
       severity: "blocker",
-      message: "Commercial invoice data is incomplete."
+      message: "Commercial invoice data is incomplete or contains invalid numeric values."
     });
   }
   if (selected.has("packing_list") && (
-    !documents.packageCount ||
-    !documents.grossWeightKg ||
-    !documents.netWeightKg
+    !isPositive(documents.packageCount) ||
+    !isPositive(documents.grossWeightKg) ||
+    !isPositive(documents.netWeightKg) ||
+    documents.grossWeightKg < documents.netWeightKg
   )) {
     findings.push({
       code: "PACKING_LIST_INCOMPLETE",
       severity: "blocker",
-      message: "Packing list must include package count and gross/net weight."
+      message: "Packing list must include valid package count and gross/net weight values."
     });
   }
   if (selected.has("bill_of_lading") && !documents.billOfLadingNumber) {

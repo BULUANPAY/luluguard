@@ -8,11 +8,19 @@ This repository is a pnpm and Turborepo monorepo.
 
 ```text
 apps/
-├── importer-mcp/       MCP server, importer workflow, payment policy, and x402 signer
-└── web/                Next.js chat UI, policy admin UI, and server-side AI integration
+├── importer-mcp/          MCP server, importer workflow, payment policy, and x402 signer
+├── portal/                React Router trade-document workspace
+├── vlei-json-signing-api/ Browser-facing JSON signing service
+├── vlei-json-signing-test/ Manual signing and verification smoke tests
+├── vlei-json-verify-mcp/  MCP server for signed JSON verification
+└── web/                   Next.js chat UI, policy admin UI, and server-side AI integration
 packages/
-├── eslint-config/      Shared ESLint configuration
-└── typescript-config/  Shared TypeScript configuration
+├── api-client/            Generated OpenAPI client and shared fetcher
+├── eslint-config/         Shared ESLint configuration
+├── shared/                Shared permissions and domain constants
+├── typescript-config/     Shared TypeScript configuration
+├── ui/                    Shared React UI components and styles
+└── vlei-json-signing/     TypeScript API and Python bridge for vLEI JSON signing
 ```
 
 | Application  | Default URL                          | Purpose                          |
@@ -55,18 +63,19 @@ Both generated files are ignored by Git. Replace every placeholder before testin
 
 Configure `apps/web/.env.local`:
 
-| Variable                  | Description                                            |
-| ------------------------- | ------------------------------------------------------ |
-| `AI_PROVIDER`             | `gemini` or `openai`                                   |
-| `GEMINI_API_KEY`          | Required when using Gemini                             |
-| `GEMINI_MODEL`            | Gemini model name                                      |
-| `OPENAI_API_KEY`          | Required when using OpenAI                             |
-| `OPENAI_MODEL`            | OpenAI model name                                      |
-| `MCP_SERVER_URL`          | Importer MCP URL, normally `http://127.0.0.1:4020/mcp` |
-| `MCP_API_KEY`             | Must exactly match the Importer MCP value              |
-| `VLEI_VERIFY_MCP_COMMAND` | Optional verifier command; defaults to `pnpm`          |
-| `VLEI_VERIFY_MCP_ARGS`    | Optional JSON array of command arguments               |
-| `VLEI_VERIFY_MCP_CWD`     | Optional cwd; defaults to the workspace root           |
+| Variable                  | Description                                               |
+| ------------------------- | --------------------------------------------------------- |
+| `AI_PROVIDER`             | `gemini` or `openai`                                      |
+| `GEMINI_API_KEY`          | Required when using Gemini                                |
+| `GEMINI_MODEL`            | Gemini model name                                         |
+| `OPENAI_API_KEY`          | Required when using OpenAI                                |
+| `OPENAI_MODEL`            | OpenAI model name                                         |
+| `MCP_SERVER_URL`          | Importer MCP URL, normally `http://127.0.0.1:4020/mcp`    |
+| `MCP_API_KEY`             | Must exactly match the Importer MCP value                 |
+| `SANDBOX_SESSION_SECRET`  | Session HMAC secret; at least 32 characters in production |
+| `VLEI_VERIFY_MCP_COMMAND` | Optional verifier command; defaults to `pnpm`             |
+| `VLEI_VERIFY_MCP_ARGS`    | Optional JSON array of command arguments                  |
+| `VLEI_VERIFY_MCP_CWD`     | Optional cwd; defaults to the workspace root              |
 
 Restart the Next.js development server after changing `.env.local`.
 
@@ -118,7 +127,7 @@ pnpm dev:portal
 The portal defaults to `http://localhost:3001` for signing. Override it with
 `VITE_VLEI_SIGNING_API_URL`; set `VITE_VLEI_SIGNING_LEI` to use another valid
 ISO 17442 LEI. The signing API's browser origin can be restricted with
-`VLEI_SIGNING_ALLOWED_ORIGIN`.
+`VLEI_SIGNING_ALLOWED_ORIGIN`; it defaults to `http://localhost:5173`.
 
 Confirm that the MCP server is available:
 

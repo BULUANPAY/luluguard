@@ -1,4 +1,4 @@
-import { generateAiAnswer, type ChatMessage } from "../../../lib/ai";
+import { generateAiAnswer } from "../../../lib/ai";
 import { mcpResultText, withMcpClient, withVleiVerifyMcpClient } from "../../../lib/mcp";
 import {
   clearAuditTraceContext,
@@ -7,6 +7,10 @@ import {
 } from "../../../lib/audit";
 import { sessionFromRequest } from "../../../lib/sandbox-auth";
 import { createAgentAuthorization } from "../../../lib/vlei-authorization";
+import {
+  parseWorkflowRequest,
+  WorkflowRequestError,
+} from "../../../lib/workflow-request";
 import documentTypes from "../../example-document-types.json";
 import exampleOrders from "../../example-orders.json";
 
@@ -19,8 +23,6 @@ const instructions = `你是進口商 AI 助理。使用者詢問已上傳的訂
 complianceReview.paymentAllowed 為 false 時，不得嘗試付款，必須先請使用者補正 blocker。
 使用者要求驗證已上傳的 vLEI 文件時，由你判斷是否呼叫 verify_uploaded_vlei_documents。此工具會從目前訂單讀取原始文件，並只驗證 v 為 "VLEIJSON-1.0" 且包含 payload、protected、signature、signer 與 proof 的文件；一般 JSON 不需驗證。由出口商提供的文件會強制比對簽章 LEI 與訂單出口商 LEI。可信任的 root AID 由 MCP 內部使用 VLEI_ROOT_SEED 固定推導，不可要求使用者提供，也不可把 envelope proof 內自帶的 rootAid 當成信任來源。驗證失敗時應清楚說明 errors，不可使用未驗證的 payload 做後續決策。
 請使用繁體中文簡潔回答，並清楚標示交易與申報結果。`;
-
-type WorkflowAction = "chat" | "precheck" | "broker_quote" | "payment";
 
 type UploadedFile = {
   documentType: string;
@@ -76,14 +78,7 @@ export async function POST(request: Request) {
         { status: 401 },
       );
     }
-        const body = (await request.json()) as {
-      message?: string;
-      messages?: ChatMessage[];
-      workflowAction?: WorkflowAction;
-      orderId?: string;
-      preflightId?: string;
-      quoteId?: string;
-        };
+    const body = parseWorkflowRequest(await request.json());
         writeAudit({
       traceId,
       spanId: requestId,
@@ -98,40 +93,7 @@ export async function POST(request: Request) {
       agentRunId,
       data: { method: request.method, url: request.url, body },
     });
-        const incoming =
-      body.messages ??
-      (body.message ? [{ role: "user" as const, content: body.message }] : []);
-        const messages = incoming
-      .filter((item): item is ChatMessage =>
-        Boolean(
-          item &&
-          (item.role === "user" || item.role === "assistant") &&
-          item.content?.trim(),
-        ),
-      )
-      .slice(-20);
-    const latest = messages.at(-1);
-    if (!latest || latest.role !== "user") {
-      writeAudit({
-        traceId,
-        spanId: requestId,
-        component: "chat-api",
-        action: "request.validate",
-        status: "blocked",
-        actor: "system",
-        data: { reason: "LAST_MESSAGE_NOT_USER" },
-      });
-      clearAuditTraceContext(traceId);
-      return Response.json(
-        { error: "最後一則訊息必須是使用者訊息" },
-        { status: 400 },
-      );
-    }
-    const paymentApproved =
-      /(同意|核准|確認).{0,12}(付款|支付)|(付款|支付).{0,12}(同意|核准|確認)|approve.{0,12}pay/i.test(
-        latest.content,
-      );
-    const workflowAction = body.workflowAction ?? "chat";
+    const { messages, workflowAction } = body;
     const workflow: {
       preflightId?: string;
       readyForBroker?: boolean;
@@ -150,8 +112,13 @@ export async function POST(request: Request) {
               preflightId: body.preflightId,
               quoteId: body.quoteId,
               estimateApproved:
-                workflowAction === "broker_quote" ? true : undefined,
-              humanApproved: workflowAction === "payment" ? true : undefined,
+                workflowAction === "broker_quote"
+                  ? body.estimateApproved
+                  : undefined,
+              humanApproved:
+                workflowAction === "payment"
+                  ? body.paymentApproved
+                  : undefined,
             },
           });
     const answer = await withMcpClient(traceId, async (mcp) => withVleiVerifyMcpClient(async (vleiMcp) => {
@@ -244,13 +211,12 @@ export async function POST(request: Request) {
           }
           if (name === "get_import_quote") {
             args.preflightId = body.preflightId;
-            args.estimateApproved = workflowAction === "broker_quote";
+            args.estimateApproved = body.estimateApproved;
           }
           if (name === "submit_import_declaration") {
             args.orderId = body.orderId;
             args.quoteId = body.quoteId;
-            args.humanApproved =
-              workflowAction === "payment" || paymentApproved;
+            args.humanApproved = body.paymentApproved;
           }
           args.authorization = authorization;
           const targetMcp = name === "verify_vlei_json" ? vleiMcp : mcp;
@@ -340,6 +306,7 @@ export async function POST(request: Request) {
         : undefined,
     });
   } catch (error) {
+    const clientError = error instanceof WorkflowRequestError;
     console.error(
       "chat.failed",
       error instanceof Error ? error.message : error,
@@ -361,7 +328,7 @@ export async function POST(request: Request) {
     clearAuditTraceContext(traceId);
     return Response.json(
       { error: error instanceof Error ? error.message : "處理失敗", traceId },
-      { status: 500 },
+      { status: clientError ? 400 : 500 },
     );
   }
 }

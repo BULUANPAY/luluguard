@@ -7,10 +7,46 @@ const appRoot =
 
 loadEnv({ path: resolve(appRoot, ".env"), override: false, quiet: true });
 
+interface NumberOptions {
+  integer?: boolean;
+  min?: number;
+  max?: number;
+}
+
+export function parseEnvironmentNumber(
+  name: string,
+  raw: string | undefined,
+  fallback: number,
+  options: NumberOptions = {},
+): number {
+  const value = raw === undefined || raw.trim() === "" ? fallback : Number(raw);
+  const { integer = false, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY } = options;
+  if (
+    !Number.isFinite(value) ||
+    (integer && !Number.isInteger(value)) ||
+    value < min ||
+    value > max
+  ) {
+    const constraints = [
+      integer && "an integer",
+      Number.isFinite(min) && `at least ${min}`,
+      Number.isFinite(max) && `at most ${max}`,
+    ].filter(Boolean).join(", ");
+    throw new Error(
+      `${name} must be a finite number${constraints ? ` (${constraints})` : ""}`,
+    );
+  }
+  return value;
+}
+
 export const config = {
   mcp: {
     host: process.env.MCP_HOST ?? "127.0.0.1",
-    port: Number(process.env.MCP_PORT ?? 4020),
+    port: parseEnvironmentNumber("MCP_PORT", process.env.MCP_PORT, 4020, {
+      integer: true,
+      min: 1,
+      max: 65_535,
+    }),
     apiKey: process.env.MCP_API_KEY ?? "",
   },
   policyAdmin: {
@@ -19,7 +55,12 @@ export const config = {
   customsBroker: {
     apiUrl: process.env.CUSTOMS_BROKER_API_URL ?? "http://127.0.0.1:4021",
     address: process.env.CUSTOMS_BROKER_ADDRESS ?? "",
-    feeUsdc: Number(process.env.CUSTOMS_BROKER_FEE_USDC ?? 0.01),
+    feeUsdc: parseEnvironmentNumber(
+      "CUSTOMS_BROKER_FEE_USDC",
+      process.env.CUSTOMS_BROKER_FEE_USDC,
+      0.01,
+      { min: 0 },
+    ),
   },
   importer: {
     address: process.env.IMPORTER_ADDRESS ?? "",
@@ -38,10 +79,30 @@ export const config = {
     },
   },
   payment: {
-    maxUsdc: Number(process.env.MAX_PAYMENT_USDC ?? 1),
-    maxDailyUsdc: Number(process.env.MAX_DAILY_PAYMENT_USDC ?? 5),
-    maxPaymentsPerHour: Number(process.env.MAX_PAYMENTS_PER_HOUR ?? 5),
-    humanApprovalAboveUsdc: Number(process.env.HUMAN_APPROVAL_ABOVE_USDC ?? 0),
+    maxUsdc: parseEnvironmentNumber(
+      "MAX_PAYMENT_USDC",
+      process.env.MAX_PAYMENT_USDC,
+      1,
+      { min: 0 },
+    ),
+    maxDailyUsdc: parseEnvironmentNumber(
+      "MAX_DAILY_PAYMENT_USDC",
+      process.env.MAX_DAILY_PAYMENT_USDC,
+      5,
+      { min: 0 },
+    ),
+    maxPaymentsPerHour: parseEnvironmentNumber(
+      "MAX_PAYMENTS_PER_HOUR",
+      process.env.MAX_PAYMENTS_PER_HOUR,
+      5,
+      { integer: true, min: 1 },
+    ),
+    humanApprovalAboveUsdc: parseEnvironmentNumber(
+      "HUMAN_APPROVAL_ABOVE_USDC",
+      process.env.HUMAN_APPROVAL_ABOVE_USDC,
+      0,
+      { min: 0 },
+    ),
   },
   x402: {
     network: process.env.X402_NETWORK ?? "eip155:84532",
@@ -49,7 +110,12 @@ export const config = {
   audit: {
     enabled: process.env.AUDIT_LOG_ENABLED !== "false",
     path: process.env.AUDIT_LOG_PATH ?? resolve(appRoot, "logs/audit.jsonl"),
-    maxValueLength: Number(process.env.AUDIT_LOG_MAX_VALUE_LENGTH ?? 8_000),
+    maxValueLength: parseEnvironmentNumber(
+      "AUDIT_LOG_MAX_VALUE_LENGTH",
+      process.env.AUDIT_LOG_MAX_VALUE_LENGTH,
+      8_000,
+      { integer: true, min: 1 },
+    ),
   },
   log: { level: process.env.LOG_LEVEL ?? "info" },
 } as const;

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type ExportDocumentType = "COMMERCIAL_INVOICE" | "PACKING_LIST";
 
 export interface Party {
@@ -99,6 +101,129 @@ export interface PackingList extends ExportDocumentBase {
 }
 
 export type ExportDocument = CommercialInvoice | PackingList;
+
+const partySchema = z
+  .object({
+    name: z.string(),
+    country: z.string(),
+    region: z.string().optional(),
+    address: z.string(),
+    vlei: z.string(),
+  })
+  .passthrough();
+const shipmentSchema = z
+  .object({
+    country_of_origin: z.string(),
+    region_of_origin: z.string(),
+    country_of_export: z.string(),
+    destination: z.string(),
+    transport_mode: z.enum(["SEA", "AIR"]),
+    vessel: z.string(),
+  })
+  .passthrough();
+const issuerSchema = z
+  .object({
+    organization: z.string(),
+    authorized_signatory: z.string(),
+    role: z.string(),
+    credential: z.string(),
+  })
+  .passthrough();
+const signatureSchema = z
+  .object({
+    type: z.literal("DIGITAL_SIGNATURE"),
+    status: z.literal("SIGNED"),
+    signed_at: z.string(),
+  })
+  .passthrough();
+const demoMetadataSchema = z
+  .object({
+    fictional: z.literal(true),
+    purpose: z.literal("Trustworthy AI Agent Hackathon Demo"),
+    warning: z.literal("FICTIONAL DEMO DATA — NOT A REAL TRADE DOCUMENT"),
+  })
+  .passthrough();
+const documentBaseSchema = z
+  .object({
+    document_id: z.string().trim().min(1),
+    issue_date: z.string(),
+    exporter: partySchema,
+    importer: partySchema,
+    shipment: shipmentSchema,
+    issuer: issuerSchema,
+    signature: signatureSchema,
+    demo_metadata: demoMetadataSchema,
+  })
+  .passthrough();
+const invoiceSchema = documentBaseSchema.extend({
+  document_type: z.literal("COMMERCIAL_INVOICE"),
+  currency: z.enum(["USD", "GBP"]),
+  shipment: shipmentSchema.extend({ incoterm: z.string() }),
+  items: z
+    .array(
+      z
+        .object({
+          line_no: z.number().finite(),
+          description: z.string(),
+          scientific_name: z.string(),
+          hs_code: z.string(),
+          quantity: z.number().finite(),
+          unit: z.literal("HEAD"),
+          unit_price: z.number().finite(),
+          amount: z.number().finite(),
+          dpp_batch_id: z.string(),
+        })
+        .passthrough(),
+    )
+    .min(1),
+  totals: z
+    .object({
+      total_quantity: z.number().finite(),
+      total_amount: z.number().finite(),
+      currency: z.enum(["USD", "GBP"]),
+    })
+    .passthrough(),
+});
+const packingListSchema = documentBaseSchema.extend({
+  document_type: z.literal("PACKING_LIST"),
+  related_invoice: z.string(),
+  packages: z
+    .object({
+      package_type: z.string(),
+      total_packages: z.number().finite(),
+      heads_per_package: z.number().finite(),
+      total_quantity: z.number().finite(),
+      unit: z.literal("HEAD"),
+    })
+    .passthrough(),
+  cargo: z
+    .array(
+      z
+        .object({
+          line_no: z.number().finite(),
+          description: z.string(),
+          scientific_name: z.string(),
+          quantity: z.number().finite(),
+          unit: z.literal("HEAD"),
+          dpp_batch_id: z.string(),
+        })
+        .passthrough(),
+    )
+    .min(1),
+  weight: z
+    .object({
+      net_weight_kg: z.number().finite(),
+      gross_weight_kg: z.number().finite(),
+    })
+    .passthrough(),
+  marks_and_numbers: z
+    .object({ mark: z.string(), range: z.string() })
+    .passthrough(),
+});
+const exportDocumentSchema = z.discriminatedUnion("document_type", [
+  invoiceSchema,
+  packingListSchema,
+]);
 
 const DEMO_METADATA: DemoMetadata = {
   fictional: true,
@@ -336,18 +461,16 @@ export function parseExportDocument(
       `目前選擇的文件類型是 ${expectedType}，但 JSON 內容不一致。`,
     );
   }
-  if (typeof value.document_id !== "string" || !value.document_id.trim()) {
-    throw new Error("document_id 不可空白。");
-  }
-  if (
-    !isRecord(value.exporter) ||
-    !isRecord(value.importer) ||
-    !isRecord(value.issuer)
-  ) {
-    throw new Error("文件必須包含 exporter、importer 與 issuer object。");
+  const parsed = exportDocumentSchema.safeParse(value);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const field = issue?.path.join(".") || "Body";
+    throw new Error(
+      `${field} 格式不正確${issue?.message ? `：${issue.message}` : "。"}`,
+    );
   }
 
-  return value as unknown as ExportDocument;
+  return parsed.data;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

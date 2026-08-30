@@ -1,8 +1,9 @@
 import { VleiJsonSigning } from "@repo/vlei-json-signing";
 
+import { parseSigningApiPort } from "./config.js";
 import { createApp } from "./server.js";
 
-const port = Number(process.env.VLEI_SIGNING_API_PORT ?? 3001);
+const port = parseSigningApiPort(process.env.VLEI_SIGNING_API_PORT);
 
 const signing = new VleiJsonSigning();
 
