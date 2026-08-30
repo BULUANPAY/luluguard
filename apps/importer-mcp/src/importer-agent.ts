@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import { createHash, randomUUID } from "node:crypto";
 import { decodePaymentResponseHeader } from "@x402/fetch";
 import type { SettleResponse } from "@x402/core/types";
@@ -9,21 +10,28 @@ import type {
   CustomsBrokerResponse,
   DutyQuote,
   ExportDocuments,
-  TradeDocumentType
 } from "./domain.js";
-import { defaultMockDocumentTypes, getMockExportDocuments } from "./mock-exporter.js";
 import { log } from "./logger.js";
 import {
+  isAllowedPayee,
   PaymentPolicyError,
   PaymentReservationError,
   PaymentReservationStore,
   type PaymentPolicyDecision,
-  type PaymentRecord
+  type PaymentRecord,
 } from "./payment/policy.js";
-import { reviewImportQuote, type ComplianceReview } from "./compliance-review.js";
-import { reviewDocumentsBeforeTransmission, type DocumentReview } from "./document-review.js";
+import {
+  reviewImportQuote,
+  type ComplianceReview,
+} from "./compliance-review.js";
+import {
+  reviewDocumentsBeforeTransmission,
+  type DocumentReview,
+} from "./document-review.js";
 import { estimateImportCosts, type ImportEstimate } from "./import-estimate.js";
 import type { PaymentDispatchAwareFetch } from "./payment/client.js";
+import { newAuditId, writeAudit, type AuditStatus } from "./audit.js";
+import type { VerifiedAgentAuthorization } from "./vlei-authorization.js";
 
 export interface PreflightResult {
   preflightId: string;
@@ -329,14 +337,6 @@ function boundedResponseBody(body: string): string {
   return `${normalized.slice(0, MAX_QUOTE_ERROR_BODY_LENGTH - 1)}…`;
 }
 
-async function readBoundedResponseBody(response: Response): Promise<string> {
-  try {
-    return boundedResponseBody(await response.text());
-  } catch {
-    return "[unavailable]";
-  }
-}
-
 function paymentResponseHeader(response: Response, includeLegacyAlias: boolean): string | null {
   const canonical = response.headers.get("payment-response");
   if (canonical !== null || !includeLegacyAlias) return canonical;
@@ -426,15 +426,37 @@ function validateBrokerResponse(
     receipt.declarationId !== expectedQuote.quote.declarationId ||
     receipt.status !== "filed" ||
     typeof receipt.brokerAddress !== "string" ||
-    receipt.brokerAddress.toLowerCase() !== expectedBrokerAddress.toLowerCase() ||
     receiptBrokerFeeAtomic !== expectedBrokerFeeAtomic ||
     typeof receipt.timestamp !== "string" ||
     !Number.isFinite(Date.parse(receipt.timestamp))
   ) {
     throw new Error("Customs broker response receipt is invalid or does not match the payment");
   }
+  if (receipt.brokerAddress.toLowerCase() !== expectedBrokerAddress.toLowerCase()) {
+    throw new Error("Broker receipt address does not match the approved payee");
+  }
 
   return value as unknown as CustomsBrokerResponse;
+}
+
+export class PaymentCoordinator {
+  private tail: Promise<void> = Promise.resolve();
+
+  async runExclusive<T>(operation: () => Promise<T>): Promise<T> {
+    let release: () => void = () => undefined;
+    const turn = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const previous = this.tail;
+    this.tail = turn;
+
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  }
 }
 
 export class ImporterAgent {
@@ -451,7 +473,10 @@ export class ImporterAgent {
     private readonly paymentHistory: PaymentRecord[] = [],
     private readonly x402Network = "eip155:84532",
     private readonly settlementPending: SettlementReconciliationStore = new Map(),
-    private readonly paymentReservations = new PaymentReservationStore()
+    private readonly paymentReservations = new PaymentReservationStore(),
+    private readonly paymentCoordinator = new PaymentCoordinator(),
+    private readonly traceId = newAuditId("TRACE"),
+    private readonly identity?: VerifiedAgentAuthorization,
   ) {
     if (x402Network !== "eip155:84532") {
       throw new Error("X402_NETWORK must be eip155:84532 for the testnet importer");
@@ -704,21 +729,53 @@ export class ImporterAgent {
     }
   }
 
-  precheck(
-    orderId: string,
-    selectedDocuments: TradeDocumentType[] = defaultMockDocumentTypes
-  ): PreflightResult {
+  private audit(
+    action: string,
+    status: AuditStatus,
+    data?: unknown,
+    spanId?: string,
+  ) {
+    writeAudit({
+      traceId: this.traceId,
+      spanId,
+      component: "importer-agent",
+      action,
+      status,
+      actor: this.identity?.userId ?? "importer-agent",
+      tenantId: this.identity?.tenantId,
+      userId: this.identity?.userId,
+      sessionId: this.identity?.sessionId,
+      agentId: "luluguard-importer-agent",
+      agentRunId: this.identity?.agentRunId,
+      data,
+    });
+  }
+
+  precheck(orderId: string, documents: ExportDocuments): PreflightResult {
     const audit: string[] = [];
     const preflightId = `PREFLIGHT-${randomUUID()}`;
-    log("info", "importer-agent", "preflight.started", { orderId, selectedDocuments });
-    const documents = getMockExportDocuments(orderId, selectedDocuments);
-    audit.push("Fetched selected mock export documents locally");
+    this.audit(
+      "preflight.review",
+      "attempted",
+      { orderId, providedDocuments: documents.providedDocuments },
+      preflightId,
+    );
+    log("info", "importer-agent", "preflight.started", {
+      orderId,
+      providedDocuments: documents.providedDocuments,
+    });
+    audit.push("Loaded export documents from the order's uploaded files");
     const documentReview = reviewDocumentsBeforeTransmission(documents);
-    audit.push(`Document review completed; readyToTransmit=${documentReview.readyToTransmit}`);
+    audit.push(
+      `Document review completed; readyToTransmit=${documentReview.readyToTransmit}`,
+    );
     const independentEstimate = documentReview.readyToTransmit
       ? estimateImportCosts(documents, this.brokerFeeUsd)
       : undefined;
-    if (independentEstimate) audit.push("Generated independent importer estimate; broker was not contacted");
+    if (independentEstimate)
+      audit.push(
+        "Generated independent importer estimate; broker was not contacted",
+      );
     const result: PreflightResult = {
       preflightId,
       orderId,
@@ -727,39 +784,121 @@ export class ImporterAgent {
       independentEstimate,
       readyForBroker: documentReview.readyToTransmit,
       transmittedToBroker: false,
-      audit
+      audit,
     };
     this.preflightStore.set(preflightId, result);
-    log(documentReview.readyToTransmit ? "info" : "warn", "importer-agent", "preflight.completed", {
-      orderId,
+    this.audit(
+      "preflight.review",
+      "succeeded",
+      {
+        input: { orderId, providedDocuments: documents.providedDocuments },
+        result,
+      },
       preflightId,
-      readyForBroker: result.readyForBroker,
-      estimatedTotalUsd: independentEstimate?.estimatedTotalUsd,
-      transmittedToBroker: false
-    });
+    );
+    log(
+      documentReview.readyToTransmit ? "info" : "warn",
+      "importer-agent",
+      "preflight.completed",
+      {
+        orderId,
+        preflightId,
+        readyForBroker: result.readyForBroker,
+        estimatedTotalUsd: independentEstimate?.estimatedTotalUsd,
+        transmittedToBroker: false,
+      },
+    );
     return result;
   }
 
-  async getQuote(preflightId: string, estimateApproved: boolean): Promise<QuoteResult> {
+  async getQuote(
+    preflightId: string,
+    estimateApproved: boolean,
+  ): Promise<QuoteResult> {
+    this.audit(
+      "broker-quote.prepare",
+      "attempted",
+      { preflightId, estimateApproved },
+      preflightId,
+    );
     const preflight = this.preflightStore.get(preflightId);
-    if (!preflight) throw new Error("A valid importer preflight is required before broker quotation");
+    if (!preflight) {
+      this.audit(
+        "broker-quote.prepare",
+        "blocked",
+        { preflightId, reason: "PREFLIGHT_NOT_FOUND" },
+        preflightId,
+      );
+      throw new Error(
+        "A valid importer preflight is required before broker quotation",
+      );
+    }
     if (!preflight.readyForBroker || !preflight.independentEstimate) {
+      this.audit(
+        "broker-quote.prepare",
+        "blocked",
+        { preflightId, reason: "DOCUMENT_REVIEW_NOT_READY", preflight },
+        preflightId,
+      );
       throw new Error("Document review must pass before broker quotation");
     }
     if (!estimateApproved) {
-      throw new Error("The user must confirm the independent estimate before documents are sent to the broker");
+      this.audit(
+        "broker-quote.prepare",
+        "blocked",
+        { preflightId, reason: "ESTIMATE_NOT_APPROVED" },
+        preflightId,
+      );
+      throw new Error(
+        "The user must confirm the independent estimate before documents are sent to the broker",
+      );
     }
-    const { orderId, documents, documentReview, independentEstimate } = preflight;
+    const { orderId, documents, documentReview, independentEstimate } =
+      preflight;
     this.validateDocuments(documents);
-    const audit = [...preflight.audit, "User confirmed the independent estimate"];
-    log("info", "importer-agent", "broker_quote.started", { orderId, preflightId });
-    const response = await this.fetch(`${this.customsBrokerApiUrl}/customs/quotes`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(documents)
+    const audit = [
+      ...preflight.audit,
+      "User confirmed the independent estimate",
+    ];
+    log("info", "importer-agent", "broker_quote.started", {
+      orderId,
+      preflightId,
     });
+    const brokerUrl = `${this.customsBrokerApiUrl}/customs/quotes`;
+    this.audit(
+      "broker.http.request",
+      "attempted",
+      { method: "POST", url: brokerUrl, body: documents },
+      preflightId,
+    );
+    let response: Response;
+    try {
+      response = await this.fetch(brokerUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-audit-trace-id": this.traceId,
+        },
+        body: JSON.stringify(documents),
+      });
+    } catch (error) {
+      this.audit(
+        "broker.http.request",
+        "failed",
+        { method: "POST", url: brokerUrl, error },
+        preflightId,
+      );
+      throw error;
+    }
     if (!response.ok) {
-      const responseBody = boundedResponseBody(await response.text());
+      const responseText = await response.text();
+      this.audit(
+        "broker.http.response",
+        "failed",
+        { url: brokerUrl, status: response.status, body: responseText },
+        preflightId,
+      );
+      const responseBody = boundedResponseBody(responseText);
       throw new Error(
         `Customs quote failed: ${response.status}`
         + (responseBody ? `; ${responseBody}` : "")
@@ -780,8 +919,20 @@ export class ImporterAgent {
       );
     }
     const quote = parsedQuoteResponse.data.quote;
-    const complianceReview = reviewImportQuote(documents, quote, this.brokerFeeUsd);
-    audit.push(`Received broker quote ${quote.quoteId} and compared it with the independent estimate`);
+    this.audit(
+      "broker.http.response",
+      "succeeded",
+      { url: brokerUrl, status: response.status, body: { quote } },
+      preflightId,
+    );
+    const complianceReview = reviewImportQuote(
+      documents,
+      quote,
+      this.brokerFeeUsd,
+    );
+    audit.push(
+      `Received broker quote ${quote.quoteId} and compared it with the independent estimate`,
+    );
     const result: QuoteResult = {
       preflightId,
       orderId,
@@ -792,32 +943,67 @@ export class ImporterAgent {
       transmittedToBroker: true,
       quote,
       complianceReview,
-      audit
+      audit,
     };
     this.quoteStore.set(quote.quoteId, result);
+    this.audit("broker-quote.review", "succeeded", { result }, preflightId);
     log("info", "importer-agent", "broker_quote.completed", {
       orderId,
       preflightId,
       quoteId: quote.quoteId,
       independentEstimateUsd: independentEstimate.estimatedTotalUsd,
       brokerEstimateUsd: quote.totalEstimatedUsd,
-      paymentAllowed: complianceReview.paymentAllowed
+      paymentAllowed: complianceReview.paymentAllowed,
     });
     return result;
   }
 
-  async submit(orderId: string, quoteId: string, humanApproved = false): Promise<SubmissionResult> {
+  async submit(
+    orderId: string,
+    quoteId: string,
+    humanApproved = false,
+  ): Promise<SubmissionResult> {
+    return this.paymentCoordinator.runExclusive(() =>
+      this.submitExclusive(orderId, quoteId, humanApproved),
+    );
+  }
+
+  private async submitExclusive(
+    orderId: string,
+    quoteId: string,
+    humanApproved: boolean,
+  ): Promise<SubmissionResult> {
     const audit: string[] = [];
     const paymentAttemptId = `ATTEMPT-${randomUUID()}`;
+    this.audit(
+      "payment.submit",
+      "attempted",
+      { orderId, quoteId, humanApproved },
+      paymentAttemptId,
+    );
     log("info", "payment-audit", "payment.attempted", {
-      paymentAttemptId, orderId, quoteId, humanApproved
+      paymentAttemptId,
+      orderId,
+      quoteId,
+      humanApproved,
     });
     const reviewedQuote = this.quoteStore.get(quoteId);
     if (!reviewedQuote || reviewedQuote.orderId !== orderId) {
+      this.audit(
+        "payment.submit",
+        "blocked",
+        { orderId, quoteId, reason: "REVIEWED_QUOTE_NOT_FOUND" },
+        paymentAttemptId,
+      );
       log("warn", "payment-audit", "payment.precondition_blocked", {
-        paymentAttemptId, orderId, quoteId, reasonCode: "REVIEWED_QUOTE_NOT_FOUND"
+        paymentAttemptId,
+        orderId,
+        quoteId,
+        reasonCode: "REVIEWED_QUOTE_NOT_FOUND",
       });
-      throw new Error("A matching reviewed broker quote is required before payment");
+      throw new Error(
+        "A matching reviewed broker quote is required before payment",
+      );
     }
     const { documents } = reviewedQuote;
     const operationIdentity = reconciliationIdentity(
@@ -846,24 +1032,58 @@ export class ImporterAgent {
     }
     const expectedBrokerFeeAtomic = expectedUsdcAtomicAmount(this.brokerFeeUsd);
     if (!reviewedQuote.complianceReview.paymentAllowed) {
+      this.audit(
+        "payment.submit",
+        "blocked",
+        {
+          orderId,
+          quoteId,
+          reason: "COMPLIANCE_REVIEW_BLOCKED",
+          complianceReview: reviewedQuote.complianceReview,
+        },
+        paymentAttemptId,
+      );
       log("warn", "payment-audit", "payment.precondition_blocked", {
-        paymentAttemptId, orderId, quoteId, reasonCode: "COMPLIANCE_REVIEW_BLOCKED"
+        paymentAttemptId,
+        orderId,
+        quoteId,
+        reasonCode: "COMPLIANCE_REVIEW_BLOCKED",
       });
-      throw new Error("Broker quote comparison blocked payment; resolve blocker findings before filing");
+      throw new Error(
+        "Broker quote comparison blocked payment; resolve blocker findings before filing",
+      );
     }
     const quoteExpiresAt = Date.parse(reviewedQuote.quote.expiresAt);
     if (!Number.isFinite(quoteExpiresAt) || quoteExpiresAt <= Date.now()) {
+      this.audit(
+        "payment.submit",
+        "blocked",
+        {
+          orderId,
+          quoteId,
+          reason: "QUOTE_EXPIRED",
+          expiresAt: reviewedQuote.quote.expiresAt,
+        },
+        paymentAttemptId,
+      );
       log("warn", "payment-audit", "payment.precondition_blocked", {
-        paymentAttemptId, orderId, quoteId, reasonCode: "QUOTE_EXPIRED",
-        expiresAt: reviewedQuote.quote.expiresAt
+        paymentAttemptId,
+        orderId,
+        quoteId,
+        reasonCode: "QUOTE_EXPIRED",
+        expiresAt: reviewedQuote.quote.expiresAt,
       });
       throw new Error("Broker quote expired before payment");
     }
     this.validateDocuments(documents);
     paymentWasDispatched(this.paidFetch);
     log("info", "payment-audit", "policy.evaluation.started", {
-      paymentAttemptId, orderId, quoteId, amountUsdc: this.brokerFeeUsd,
-      payee: this.brokerAddress, humanApproved
+      paymentAttemptId,
+      orderId,
+      quoteId,
+      amountUsdc: this.brokerFeeUsd,
+      payee: this.brokerAddress,
+      humanApproved,
     });
     let paymentPolicyDecision: PaymentPolicyDecision;
     let reservationId: string;
@@ -881,7 +1101,10 @@ export class ImporterAgent {
     } catch (error) {
       if (error instanceof PaymentPolicyError) {
         log("warn", "payment-audit", "policy.evaluation.blocked", {
-          paymentAttemptId, orderId, quoteId, ...error.decision
+          paymentAttemptId,
+          orderId,
+          quoteId,
+          ...error.decision,
         });
       } else if (error instanceof PaymentReservationError) {
         log("warn", "payment-audit", "policy.evaluation.blocked", {
@@ -892,9 +1115,23 @@ export class ImporterAgent {
           reservationId: error.reservation.reservationId
         });
       }
+      this.audit(
+        "payment.policy-evaluation",
+        "blocked",
+        { orderId, quoteId, error },
+        paymentAttemptId,
+      );
       throw error;
     }
-    audit.push(`Payment policy approved; auditId=${paymentPolicyDecision.auditId}`);
+    this.audit(
+      "payment.policy-evaluation",
+      "succeeded",
+      { orderId, quoteId, decision: paymentPolicyDecision },
+      paymentAttemptId,
+    );
+    audit.push(
+      `Payment policy approved; auditId=${paymentPolicyDecision.auditId}`,
+    );
     log("info", "payment-audit", "policy.evaluation.allowed", {
       orderId,
       quoteId,
@@ -902,18 +1139,44 @@ export class ImporterAgent {
       ...paymentPolicyDecision,
       importerAddress: this.importerAddress,
       brokerAddress: this.brokerAddress,
-      networkAction: "x402-payment"
+      networkAction: "x402-payment",
     });
     log("info", "payment-audit", "payment.dispatched", {
-      paymentAttemptId, auditId: paymentPolicyDecision.auditId,
-      orderId, quoteId, amountUsdc: this.brokerFeeUsd
+      paymentAttemptId,
+      auditId: paymentPolicyDecision.auditId,
+      orderId,
+      quoteId,
+      amountUsdc: this.brokerFeeUsd,
     });
     let paidResponse: Response;
-    try {
-      paidResponse = await this.paidFetch(`${this.customsBrokerApiUrl}/customs/declarations`, {
+    const declarationUrl = `${this.customsBrokerApiUrl}/customs/declarations`;
+    this.audit(
+      "broker.paid-http.request",
+      "attempted",
+      {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ quoteId, documents })
+        url: declarationUrl,
+        body: {
+          quoteId,
+          documents,
+          documentReview: reviewedQuote.documentReview,
+        },
+        paymentPolicyDecision,
+      },
+      paymentAttemptId,
+    );
+    try {
+      paidResponse = await this.paidFetch(declarationUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-audit-trace-id": this.traceId,
+        },
+        body: JSON.stringify({
+          quoteId,
+          documents,
+          documentReview: reviewedQuote.documentReview,
+        }),
       });
     } catch (error) {
       let dispatched = false;
@@ -945,8 +1208,14 @@ export class ImporterAgent {
         orderId,
         quoteId,
         paymentDispatched: dispatched,
-        message: error instanceof Error ? error.message : String(error)
+        message: error instanceof Error ? error.message : String(error),
       });
+      this.audit(
+        "broker.paid-http.request",
+        "failed",
+        { method: "POST", url: declarationUrl, error },
+        paymentAttemptId,
+      );
       if (dispatchTrackingFailed || dispatched) {
         if (dispatchTrackingFailed) {
           throw error;
@@ -984,7 +1253,8 @@ export class ImporterAgent {
       throw error;
     }
     if (!paidResponse.ok) {
-      const responseBody = await readBoundedResponseBody(paidResponse);
+      const responseText = await paidResponse.text();
+      const responseBody = boundedResponseBody(responseText);
       const paymentResponse = paymentResponseHeader(paidResponse, true);
       let decodedSettlement: unknown;
       let decodeFailed = false;
@@ -1064,6 +1334,16 @@ export class ImporterAgent {
         }
       }
       const settlementInfo = settlementDiagnostic(paymentResponse);
+      this.audit(
+        "broker.paid-http.response",
+        "failed",
+        {
+          url: declarationUrl,
+          status: paidResponse.status,
+          body: responseText,
+        },
+        paymentAttemptId,
+      );
       log("error", "payment-audit", "payment.rejected", {
         paymentAttemptId, auditId: paymentPolicyDecision.auditId,
         orderId,
@@ -1178,6 +1458,7 @@ export class ImporterAgent {
         this.brokerAddress,
         expectedBrokerFeeAtomic
       );
+      this.validateBrokerResponse(reviewedQuote.quote, response);
     } catch (error) {
       if (paymentDispatched) {
         this.recordPostPaymentValidationFailure(
@@ -1197,13 +1478,24 @@ export class ImporterAgent {
       }
       throw error;
     }
-    const complianceReview = reviewedQuote.complianceReview;
+    this.audit(
+      "broker.paid-http.response",
+      "succeeded",
+      {
+        url: declarationUrl,
+        status: paidResponse.status,
+        body: response,
+        paymentResponse,
+        settlement: decodedSettlement,
+      },
+      paymentAttemptId,
+    );
     this.paymentHistory.push({
-      timestamp: response.receipt.timestamp,
-      amountUsdc: response.receipt.brokerFeeUsd,
-      payee: response.receipt.brokerAddress,
+      timestamp: new Date().toISOString(),
+      amountUsdc: this.brokerFeeUsd,
+      payee: this.brokerAddress,
       quoteId,
-      receiptId: response.receipt.receiptId
+      receiptId: response.receipt.receiptId,
     });
     this.quoteStore.delete(quoteId);
     this.clearSettlementReconciliation(operationIdentity, paymentAttemptId);
@@ -1216,27 +1508,77 @@ export class ImporterAgent {
       receiptId: response.receipt.receiptId,
       amountUsdc: response.receipt.brokerFeeUsd,
       payee: response.receipt.brokerAddress,
-      settlementRecorded: Boolean(decodedSettlement)
+      settlementRecorded: Boolean(decodedSettlement),
     });
-    audit.push(`Paid customs broker and received receipt ${response.receipt.receiptId}`);
-    return {
+    audit.push(
+      `Paid customs broker and received receipt ${response.receipt.receiptId}`,
+    );
+    const result = {
       ...reviewedQuote,
       quote: response.quote,
-      complianceReview,
+      complianceReview: reviewImportQuote(
+        documents,
+        response.quote,
+        this.brokerFeeUsd,
+      ),
       paymentPolicyDecision,
       receipt: response.receipt,
       settlement: decodedSettlement,
-      audit: [...reviewedQuote.audit, ...audit]
+      audit: [...reviewedQuote.audit, ...audit],
     };
+    this.audit(
+      "payment.submit",
+      "succeeded",
+      { orderId, quoteId, result },
+      paymentAttemptId,
+    );
+    return result;
   }
 
   private validateDocuments(documents: ExportDocuments) {
-    if (!documents.invoiceNumber || !documents.exporter || !documents.importer) {
-      throw new Error("Trade documents are missing required parties or invoice number");
+    if (
+      !documents.invoiceNumber ||
+      !documents.exporter ||
+      !documents.importer
+    ) {
+      throw new Error(
+        "Trade documents are missing required parties or invoice number",
+      );
     }
-    if (!documents.items.length) throw new Error("Trade documents contain no items");
-    if (documents.items.some(item => !item.hsCode)) {
+    if (!documents.items.length)
+      throw new Error("Trade documents contain no items");
+    if (documents.items.some((item) => !item.hsCode)) {
       throw new Error("Every item must have an HS code before customs filing");
+    }
+  }
+
+  private validateBrokerResponse(
+    reviewedQuote: DutyQuote,
+    response: CustomsBrokerResponse,
+  ) {
+    if (!isDeepStrictEqual(response.quote, reviewedQuote)) {
+      throw new Error("Paid broker response does not match the reviewed quote");
+    }
+    if (response.receipt.declarationId !== reviewedQuote.declarationId) {
+      throw new Error(
+        "Broker receipt declaration does not match the reviewed quote",
+      );
+    }
+    if (
+      Math.abs(response.receipt.brokerFeeUsd - this.brokerFeeUsd) > 0.000001
+    ) {
+      throw new Error("Broker receipt fee does not match the approved payment");
+    }
+    if (!isAllowedPayee(response.receipt.brokerAddress, this.brokerAddress)) {
+      throw new Error(
+        "Broker receipt address does not match the approved payee",
+      );
+    }
+    if (response.receipt.status !== "filed") {
+      throw new Error("Broker receipt does not confirm a filed declaration");
+    }
+    if (!Number.isFinite(Date.parse(response.receipt.timestamp))) {
+      throw new Error("Broker receipt timestamp is invalid");
     }
   }
 }

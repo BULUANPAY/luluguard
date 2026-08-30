@@ -3,40 +3,50 @@ import { createServer as createHttpServer, type Server } from "node:http";
 import { test } from "node:test";
 import { encodePaymentResponseHeader } from "@x402/core/http";
 import type { SettleResponse } from "@x402/core/types";
-import {
-  ImporterAgent,
-  type SettlementReconciliationRecord,
-} from "../src/importer-agent.js";
-import { config } from "../src/config.js";
+import type { SettlementReconciliationRecord } from "../src/importer-agent.js";
 import type { DutyQuote } from "../src/domain.js";
-import {
-  createApp,
-  createImporterServerStores,
-  type ImporterServerStores,
-} from "../src/mcp-server.js";
 import type { PaymentDispatchAwareFetch } from "../src/payment/client.js";
 
 const adminKey = "admin-test-key";
 const network = "eip155:84532" as const;
+const brokerAddress = "0x2222222222222222222222222222222222222222";
+const importerAddress = "0x1111111111111111111111111111111111111111";
+
+process.env.CUSTOMS_BROKER_ADDRESS = brokerAddress;
+process.env.IMPORTER_ADDRESS = importerAddress;
+process.env.X402_NETWORK = network;
+
+const [
+  { ImporterAgent },
+  { config },
+  { createApp, createImporterServerStores },
+  { getMockExportDocuments },
+  { validDutyQuote },
+] = await Promise.all([
+  import("../src/importer-agent.js"),
+  import("../src/config.js"),
+  import("../src/mcp-server.js"),
+  import("../src/mock-exporter.js"),
+  import("./fixtures.js"),
+]);
+
+type ImporterServerStores = ReturnType<typeof createImporterServerStores>;
 
 function createQuote(quoteId: string, orderId: string): DutyQuote {
   const brokerFee = config.customsBroker.feeUsdc;
   return {
+    ...validDutyQuote,
     quoteId,
     expiresAt: new Date(Date.now() + 60_000).toISOString(),
     declarationId: `DECL-${orderId}`,
-    goodsValueUsd: 1200,
-    freightUsd: 80,
-    insuranceUsd: 12,
-    customsValueUsd: 1292,
-    appliedDutyRatePercent: 5,
-    tariffBasis: "mock-tariff-profile",
-    dutyUsd: 64.6,
-    taxUsd: 67.83,
-    tradePromotionFeeUsd: 0.52,
-    filingFeeUsd: 2,
     customsBrokerFeeUsd: brokerFee,
-    totalEstimatedUsd: Number((64.6 + 67.83 + 0.52 + 2 + brokerFee).toFixed(6)),
+    totalEstimatedUsd: Number(
+      (
+        validDutyQuote.totalEstimatedUsd -
+        validDutyQuote.customsBrokerFeeUsd +
+        brokerFee
+      ).toFixed(6),
+    ),
   };
 }
 
@@ -78,8 +88,8 @@ async function seedReconciliation(): Promise<{
     quoteFetch,
     paidFetch,
     config.customsBroker.feeUsdc,
-    config.customsBroker.address,
-    config.importer.address,
+    brokerAddress,
+    importerAddress,
     stores.preflightStore,
     stores.quoteStore,
     stores.paymentHistory,
@@ -87,7 +97,7 @@ async function seedReconciliation(): Promise<{
     stores.settlementReconciliationStore,
     stores.paymentReservationStore,
   );
-  const preflight = agent.precheck(orderId);
+  const preflight = agent.precheck(orderId, getMockExportDocuments(orderId));
   await agent.getQuote(preflight.preflightId, true);
   await assert.rejects(
     () => agent.submit(orderId, quoteId, true),

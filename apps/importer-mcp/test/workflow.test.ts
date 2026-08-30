@@ -6,31 +6,17 @@ import {
   ImporterAgent,
   type SettlementReconciliationRecord
 } from "../src/importer-agent.js";
-import type { DutyQuote } from "../src/domain.js";
+import { getMockExportDocuments } from "../src/mock-exporter.js";
 import { PaymentReservationStore, type PaymentRecord } from "../src/payment/policy.js";
 import type { PaymentDispatchAwareFetch } from "../src/payment/client.js";
+import { validDutyQuote } from "./fixtures.js";
 
 const importerAddress = "0x1111111111111111111111111111111111111111";
 const brokerAddress = "0x2222222222222222222222222222222222222222";
 const network = "eip155:84532";
-const quoteId = "QUOTE-TEST";
-const quote: DutyQuote = {
-  quoteId,
-  expiresAt: new Date(Date.now() + 60_000).toISOString(),
-  declarationId: "DECL-INV-TEST-001",
-  goodsValueUsd: 1200,
-  freightUsd: 80,
-  insuranceUsd: 12,
-  customsValueUsd: 1292,
-  appliedDutyRatePercent: 5,
-  tariffBasis: "mock-tariff-profile",
-  dutyUsd: 64.6,
-  taxUsd: 67.83,
-  tradePromotionFeeUsd: 0.52,
-  filingFeeUsd: 2,
-  customsBrokerFeeUsd: 0.01,
-  totalEstimatedUsd: 134.96
-};
+
+const quoteId = validDutyQuote.quoteId;
+const quote = validDutyQuote;
 
 const successfulSettlement: SettleResponse = {
   success: true,
@@ -44,8 +30,8 @@ function freeQuoteFetch(onCall?: () => void, quoted = quote): typeof globalThis.
   return async () => {
     onCall?.();
     return new Response(JSON.stringify({ quote: quoted }), {
-    status: 200,
-    headers: { "content-type": "application/json" }
+      status: 200,
+      headers: { "content-type": "application/json" },
     });
   };
 }
@@ -84,7 +70,11 @@ function fakePaidFetch(
 }
 
 function createAgent(
-  policy = { maxPaymentUsd: 1, allowedPayees: [brokerAddress], requireHumanApprovalAboveUsd: 0 },
+  policy = {
+    maxPaymentUsd: 1,
+    allowedPayees: [brokerAddress],
+    requireHumanApprovalAboveUsd: 0,
+  },
   paidFetch = fakePaidFetch(),
   quoteFetch = freeQuoteFetch(),
   brokerFeeUsd = 0.01
@@ -96,12 +86,12 @@ function createAgent(
     paidFetch,
     brokerFeeUsd,
     brokerAddress,
-    importerAddress
+    importerAddress,
   );
 }
 
 async function precheckAndQuote(agent: ImporterAgent, orderId: string) {
-  const preflight = agent.precheck(orderId);
+  const preflight = agent.precheck(orderId, getMockExportDocuments(orderId));
   return agent.getQuote(preflight.preflightId, true);
 }
 
@@ -149,19 +139,33 @@ async function assertInvalidSettlementBlocksRetry(
 
 test("precheck estimates costs without calling the broker", () => {
   let brokerCalled = false;
-  const result = createAgent(undefined, undefined, freeQuoteFetch(() => { brokerCalled = true; })).precheck("TEST-PREFLIGHT");
+  const result = createAgent(
+    undefined,
+    undefined,
+    freeQuoteFetch(() => {
+      brokerCalled = true;
+    }),
+  ).precheck("TEST-PREFLIGHT", getMockExportDocuments("TEST-PREFLIGHT"));
   assert.equal(result.readyForBroker, true);
   assert.equal(result.transmittedToBroker, false);
-  assert.equal(result.independentEstimate?.estimatedTotalUsd, 134.96);
+  assert.equal(result.independentEstimate?.estimatedTotalUsd, 2_908.94);
   assert.equal(brokerCalled, false);
 });
 
 test("quote is returned without calling the paid fetch", async () => {
   let paid = false;
-  const result = await precheckAndQuote(createAgent(undefined, fakePaidFetch(() => { paid = true; })), "TEST-001");
+  const result = await precheckAndQuote(
+    createAgent(
+      undefined,
+      fakePaidFetch(() => {
+        paid = true;
+      }),
+    ),
+    "TEST-001",
+  );
   assert.ok(result.quote);
   assert.equal(result.quote.quoteId, quoteId);
-  assert.equal(result.quote.totalEstimatedUsd, 134.96);
+  assert.equal(result.quote.totalEstimatedUsd, 2_908.94);
   assert.equal(paid, false);
 });
 
@@ -174,20 +178,60 @@ test("approved declaration uses the quote and paid fetch", async () => {
   assert.equal(result.quote.quoteId, quoteId);
 });
 
+test("serializes concurrent submissions so a quote is paid only once", async () => {
+  let paidCalls = 0;
+  let notifyPaymentStarted: () => void = () => {};
+  let releasePayment: () => void = () => {};
+  const paymentStarted = new Promise<void>((resolve) => {
+    notifyPaymentStarted = resolve;
+  });
+  const paymentReleased = new Promise<void>((resolve) => {
+    releasePayment = resolve;
+  });
+  const paidFetch = withDispatchTracking(async () => {
+    paidCalls += 1;
+    notifyPaymentStarted();
+    await paymentReleased;
+    return fakePaidFetch()("http://broker.test");
+  });
+  const agent = createAgent(undefined, paidFetch);
+  await precheckAndQuote(agent, "TEST-CONCURRENT");
+
+  const first = agent.submit("TEST-CONCURRENT", quoteId, true);
+  await paymentStarted;
+  const second = agent.submit("TEST-CONCURRENT", quoteId, true);
+  releasePayment();
+
+  const results = await Promise.allSettled([first, second]);
+  assert.equal(paidCalls, 1);
+  assert.equal(results[0]?.status, "fulfilled");
+  assert.equal(results[1]?.status, "rejected");
+  assert.match(
+    String((results[1] as PromiseRejectedResult).reason),
+    /matching reviewed broker quote/i,
+  );
+});
+
 test("payment policy blocks unapproved submission", async () => {
   const agent = createAgent();
   await precheckAndQuote(agent, "TEST-002");
-  await assert.rejects(() => agent.submit("TEST-002", quoteId, false), /HUMAN_APPROVAL_REQUIRED/);
+  await assert.rejects(
+    () => agent.submit("TEST-002", quoteId, false),
+    /HUMAN_APPROVAL_REQUIRED/,
+  );
 });
 
 test("hard spending limit blocks payment even when approved", async () => {
   const agent = createAgent({
     maxPaymentUsd: 0.005,
     allowedPayees: [brokerAddress],
-    requireHumanApprovalAboveUsd: 0
+    requireHumanApprovalAboveUsd: 0,
   });
   await precheckAndQuote(agent, "TEST-003");
-  await assert.rejects(() => agent.submit("TEST-003", quoteId, true), /PER_PAYMENT_LIMIT_EXCEEDED/);
+  await assert.rejects(
+    () => agent.submit("TEST-003", quoteId, true),
+    /PER_PAYMENT_LIMIT_EXCEEDED/,
+  );
 });
 
 test("shared in-flight policy reservation limits concurrent dispatches", async () => {
@@ -265,6 +309,9 @@ test("shared in-flight policy reservation limits concurrent dispatches", async (
 
 test("shared reservation rejects concurrent submissions for the same quote", async () => {
   const reservationStore = new PaymentReservationStore();
+  const preflightStore = new Map();
+  const quoteStore = new Map();
+  const paymentHistory: PaymentRecord[] = [];
   let paidFetchCalls = 0;
   let releaseFirst!: () => void;
   const firstSettled = new Promise<void>(resolve => { releaseFirst = resolve; });
@@ -276,7 +323,7 @@ test("shared reservation rejects concurrent submissions for the same quote", asy
     await firstSettled;
     return fakePaidFetch()(input, init);
   });
-  const agent = new ImporterAgent(
+  const createSharedAgent = () => new ImporterAgent(
     "http://broker.test",
     { maxPaymentUsd: 1, allowedPayees: [brokerAddress], requireHumanApprovalAboveUsd: 0 },
     freeQuoteFetch(),
@@ -284,19 +331,21 @@ test("shared reservation rejects concurrent submissions for the same quote", asy
     0.01,
     brokerAddress,
     importerAddress,
-    new Map(),
-    new Map(),
-    [],
+    preflightStore,
+    quoteStore,
+    paymentHistory,
     network,
     new Map(),
     reservationStore
   );
-  await precheckAndQuote(agent, "TEST-SAME-QUOTE-CONCURRENT");
+  const firstAgent = createSharedAgent();
+  const secondAgent = createSharedAgent();
+  await precheckAndQuote(firstAgent, "TEST-SAME-QUOTE-CONCURRENT");
 
-  const first = agent.submit("TEST-SAME-QUOTE-CONCURRENT", quoteId, true);
+  const first = firstAgent.submit("TEST-SAME-QUOTE-CONCURRENT", quoteId, true);
   await firstStartedPromise;
   await assert.rejects(
-    () => agent.submit("TEST-SAME-QUOTE-CONCURRENT", quoteId, true),
+    () => secondAgent.submit("TEST-SAME-QUOTE-CONCURRENT", quoteId, true),
     /PAYMENT_ALREADY_IN_FLIGHT/
   );
   releaseFirst();
@@ -404,47 +453,87 @@ test("reconciliation write collisions do not leave an active reservation", async
 test("importer and customs broker may use the same address", async () => {
   const agent = new ImporterAgent(
     "http://broker.test",
-    { maxPaymentUsd: 1, allowedPayees: [importerAddress], requireHumanApprovalAboveUsd: 0 },
+    {
+      maxPaymentUsd: 1,
+      allowedPayees: [importerAddress],
+      requireHumanApprovalAboveUsd: 0,
+    },
     freeQuoteFetch(),
     fakePaidFetch(undefined, 200, undefined, importerAddress),
     0.01,
     importerAddress,
-    importerAddress
+    importerAddress,
   );
   await precheckAndQuote(agent, "TEST-SAME");
   const result = await agent.submit("TEST-SAME", quoteId, true);
   assert.equal(result.receipt.status, "filed");
+  assert.equal(result.receipt.brokerAddress, importerAddress);
+});
+
+test("rejects a receipt from a different broker address", async () => {
+  const unexpectedBroker = "0x3333333333333333333333333333333333333333";
+  const agent = createAgent(
+    undefined,
+    fakePaidFetch(undefined, 200, undefined, unexpectedBroker),
+  );
+  await precheckAndQuote(agent, "TEST-WRONG-BROKER");
+
+  await assert.rejects(
+    () => agent.submit("TEST-WRONG-BROKER", quoteId, true),
+    /receipt address does not match the approved payee/i,
+  );
 });
 
 test("quote compares broker fees with the independent importer estimate", async () => {
   const result = await precheckAndQuote(createAgent(), "TEST-REVIEW");
   assert.ok(result.complianceReview);
   assert.equal(result.complianceReview.paymentAllowed, true);
-  assert.equal(result.independentEstimate.estimatedTotalUsd, result.quote.totalEstimatedUsd);
+  assert.equal(
+    result.independentEstimate.estimatedTotalUsd,
+    result.quote.totalEstimatedUsd,
+  );
   assert.equal(result.complianceReview.tariffLookupRequired, true);
-  assert.ok(result.complianceReview.missingInformation.includes("Taiwan import permit or competent-authority approval when applicable"));
+  assert.ok(
+    result.complianceReview.missingInformation.includes(
+      "Taiwan import permit or competent-authority approval when applicable",
+    ),
+  );
 });
 
 test("submission requires a matching reviewed quote", async () => {
   await assert.rejects(
     () => createAgent().submit("TEST-NO-REVIEW", quoteId, true),
-    /matching reviewed broker quote/i
+    /matching reviewed broker quote/i,
   );
 });
 
 test("submission rechecks quote expiration immediately before payment", async () => {
-  const expiredQuote = { ...quote, expiresAt: new Date(Date.now() - 1_000).toISOString() };
-  const agent = createAgent(undefined, undefined, async () => new Response(
-    JSON.stringify({ quote: expiredQuote }),
-    { status: 200, headers: { "content-type": "application/json" } }
-  ));
-  const preflight = agent.precheck("TEST-EXPIRED");
+  const expiredQuote = {
+    ...quote,
+    expiresAt: new Date(Date.now() - 1_000).toISOString(),
+  };
+  const agent = createAgent(
+    undefined,
+    undefined,
+    async () =>
+      new Response(JSON.stringify({ quote: expiredQuote }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+  );
+  const preflight = agent.precheck(
+    "TEST-EXPIRED",
+    getMockExportDocuments("TEST-EXPIRED"),
+  );
   const result = await agent.getQuote(preflight.preflightId, true);
   assert.equal(result.complianceReview.paymentAllowed, false);
-  await assert.rejects(() => agent.submit("TEST-EXPIRED", quoteId, true), /comparison blocked payment/);
+  await assert.rejects(
+    () => agent.submit("TEST-EXPIRED", quoteId, true),
+    /comparison blocked payment/,
+  );
 });
 
-test("slow settlement may finish after quote expiry without re-running expiry review", async () => {
+test("slow settlement returns the post-payment compliance review after quote expiry", async () => {
   const expiringQuote = {
     ...quote,
     expiresAt: new Date(Date.now() + 300).toISOString()
@@ -467,27 +556,142 @@ test("slow settlement may finish after quote expiry without re-running expiry re
   await precheckAndQuote(agent, "TEST-SLOW-SETTLEMENT");
   const result = await agent.submit("TEST-SLOW-SETTLEMENT", quoteId, true);
   assert.equal(result.settlement.transaction, successfulSettlement.transaction);
-  assert.equal(result.complianceReview.paymentAllowed, true);
+  assert.equal(result.complianceReview.paymentAllowed, false);
 });
 
 test("missing required documents are blocked before broker transmission", async () => {
   let brokerCalled = false;
-  const agent = createAgent(undefined, undefined, freeQuoteFetch(() => { brokerCalled = true; }));
-  const result = agent.precheck("TEST-MISSING", ["commercial_invoice"]);
+  const agent = createAgent(
+    undefined,
+    undefined,
+    freeQuoteFetch(() => {
+      brokerCalled = true;
+    }),
+  );
+  const result = agent.precheck(
+    "TEST-MISSING",
+    getMockExportDocuments("TEST-MISSING", ["commercial_invoice"]),
+  );
   assert.equal(result.documentReview.readyToTransmit, false);
   assert.equal(result.transmittedToBroker, false);
   assert.equal(brokerCalled, false);
-  assert.deepEqual(
-    result.documentReview.missingRequiredDocuments.sort(),
-    ["bill_of_lading", "packing_list"]
+  assert.deepEqual(result.documentReview.missingRequiredDocuments.sort(), [
+    "bill_of_lading",
+    "digital_product_passport",
+    "packing_list",
+  ]);
+});
+
+test("validates DPP and classifies the product as low carbon before transmission", () => {
+  const result = createAgent().precheck(
+    "TEST-DPP",
+    getMockExportDocuments("TEST-DPP"),
+  );
+
+  assert.equal(result.readyForBroker, true);
+  assert.equal(result.documentReview.lowCarbonAssessment.documentValid, true);
+  assert.equal(
+    result.documentReview.lowCarbonAssessment.qualifiesAsLowCarbonProduct,
+    true,
+  );
+  assert.equal(
+    result.documentReview.lowCarbonAssessment.calculatedReductionPercent,
+    28,
+  );
+});
+
+test("blocks an inconsistent DPP before customs transmission", () => {
+  let brokerCalled = false;
+  const documents = getMockExportDocuments("TEST-DPP-MISMATCH");
+  documents.digitalProductPassport!.carbonFootprint.claimedReductionPercent = 40;
+  const result = createAgent(
+    undefined,
+    undefined,
+    freeQuoteFetch(() => {
+      brokerCalled = true;
+    }),
+  ).precheck("TEST-DPP-MISMATCH", documents);
+
+  assert.equal(result.readyForBroker, false);
+  assert.equal(brokerCalled, false);
+  assert.ok(
+    result.documentReview.findings.some(
+      (finding) => finding.code === "DPP_CARBON_REDUCTION_MISMATCH",
+    ),
+  );
+});
+
+test("submits the validated DPP and low-carbon decision at customs filing", async () => {
+  let submittedBody: unknown;
+  const paidFetch = withDispatchTracking(async (_input, init) => {
+    submittedBody = JSON.parse(String(init?.body));
+    return fakePaidFetch()("http://broker.test");
+  });
+  const agent = createAgent(undefined, paidFetch);
+  await precheckAndQuote(agent, "TEST-DPP-SUBMIT");
+  await agent.submit("TEST-DPP-SUBMIT", quoteId, true);
+
+  const body = submittedBody as {
+    documents: ReturnType<typeof getMockExportDocuments>;
+    documentReview: {
+      lowCarbonAssessment: { qualifiesAsLowCarbonProduct: boolean };
+    };
+  };
+  assert.ok(body.documents.digitalProductPassport);
+  assert.equal(
+    body.documentReview.lowCarbonAssessment.qualifiesAsLowCarbonProduct,
+    true,
+  );
+});
+
+test("invalid invoice and packing values are blocked before broker transmission", async () => {
+  let brokerCalled = false;
+  const agent = createAgent(
+    undefined,
+    undefined,
+    freeQuoteFetch(() => {
+      brokerCalled = true;
+    }),
+  );
+  const documents = getMockExportDocuments("TEST-INVALID-NUMBERS");
+  documents.items[0]!.quantity = -1;
+  documents.grossWeightKg = 400;
+  documents.netWeightKg = 420;
+
+  const result = agent.precheck("TEST-INVALID-NUMBERS", documents);
+
+  assert.equal(result.readyForBroker, false);
+  assert.equal(result.independentEstimate, undefined);
+  assert.equal(brokerCalled, false);
+  assert.ok(
+    result.documentReview.findings.some(
+      (finding) => finding.code === "COMMERCIAL_INVOICE_INCOMPLETE",
+    ),
+  );
+  assert.ok(
+    result.documentReview.findings.some(
+      (finding) => finding.code === "PACKING_LIST_INCOMPLETE",
+    ),
   );
 });
 
 test("broker quote requires explicit estimate confirmation", async () => {
   let brokerCalled = false;
-  const agent = createAgent(undefined, undefined, freeQuoteFetch(() => { brokerCalled = true; }));
-  const preflight = agent.precheck("TEST-NO-CONFIRM");
-  await assert.rejects(() => agent.getQuote(preflight.preflightId, false), /must confirm/);
+  const agent = createAgent(
+    undefined,
+    undefined,
+    freeQuoteFetch(() => {
+      brokerCalled = true;
+    }),
+  );
+  const preflight = agent.precheck(
+    "TEST-NO-CONFIRM",
+    getMockExportDocuments("TEST-NO-CONFIRM"),
+  );
+  await assert.rejects(
+    () => agent.getQuote(preflight.preflightId, false),
+    /must confirm/,
+  );
   assert.equal(brokerCalled, false);
 });
 
@@ -516,7 +720,8 @@ test("malformed broker quotes are rejected before entering the quote store", asy
       new Map(),
       quoteStore
     );
-    const preflight = agent.precheck(`TEST-MALFORMED-QUOTE-${index}`);
+    const orderId = `TEST-MALFORMED-QUOTE-${index}`;
+    const preflight = agent.precheck(orderId, getMockExportDocuments(orderId));
     await assert.rejects(
       () => agent.getQuote(preflight.preflightId, true),
       /Customs broker quote is invalid/
@@ -1129,7 +1334,8 @@ test("quote errors include bounded response-body diagnostics", async () => {
       headers: { "content-type": "text/plain" }
     })
   );
-  const preflight = agent.precheck("TEST-QUOTE-ERROR-DIAGNOSTIC");
+  const orderId = "TEST-QUOTE-ERROR-DIAGNOSTIC";
+  const preflight = agent.precheck(orderId, getMockExportDocuments(orderId));
   await assert.rejects(
     () => agent.getQuote(preflight.preflightId, true),
     error => {

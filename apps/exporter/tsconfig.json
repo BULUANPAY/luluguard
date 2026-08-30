@@ -1,0 +1,17 @@
+{
+  "extends": "@repo/typescript-config/react-library.json",
+  "include": [
+    "app/**/*",
+    ".react-router/types/**/*",
+    "react-router.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ],
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "rootDirs": [".", "./.react-router/types"],
+    "types": ["node", "vite/client"]
+  }
+}

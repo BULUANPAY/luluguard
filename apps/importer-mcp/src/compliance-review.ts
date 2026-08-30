@@ -1,5 +1,6 @@
 import { convertToTokenAmount, numberToDecimalString } from "@x402/core/utils";
 import type { DutyQuote, ExportDocuments } from "./domain.js";
+import { calculateImportCharges } from "./import-charges.js";
 
 export type ReviewSeverity = "info" | "warning" | "blocker";
 
@@ -58,10 +59,7 @@ export function reviewImportQuote(
   expectedBrokerFeeUsd: number
 ): ComplianceReview {
   const findings: ReviewFinding[] = [];
-  const goodsValueUsd = Number(documents.items.reduce(
-    (sum, item) => sum + item.quantity * item.unitPriceUsd,
-    0
-  ).toFixed(2));
+  const expected = calculateImportCharges(documents, expectedBrokerFeeUsd);
 
   if (documents.destinationCountry !== "TW") {
     findings.push({
@@ -87,21 +85,32 @@ export function reviewImportQuote(
       message: "At least one HS code is shorter than a Taiwan tariff classification; confirm the applicable tariff line and import regulations."
     });
   }
-  const expectedCustomsValue = Number((
-    goodsValueUsd + (documents.freightUsd ?? 0) + (documents.insuranceUsd ?? 0)
-  ).toFixed(2));
-  if (!centsEqual(quote.goodsValueUsd, goodsValueUsd)) {
+  if (!centsEqual(quote.goodsValueUsd, expected.goodsValueUsd)) {
     findings.push({
       code: "GOODS_VALUE_MISMATCH",
       severity: "blocker",
-      message: `Quoted goods value ${quote.goodsValueUsd} does not match invoice goods value ${goodsValueUsd}.`
+      message: `Quoted goods value ${quote.goodsValueUsd} does not match invoice goods value ${expected.goodsValueUsd}.`
     });
   }
-  if (!centsEqual(quote.customsValueUsd, expectedCustomsValue)) {
+  if (!centsEqual(quote.freightUsd, expected.freightUsd)) {
+    findings.push({
+      code: "FREIGHT_VALUE_MISMATCH",
+      severity: "blocker",
+      message: `Quoted freight value ${quote.freightUsd} does not match document freight value ${expected.freightUsd}.`
+    });
+  }
+  if (!centsEqual(quote.insuranceUsd, expected.insuranceUsd)) {
+    findings.push({
+      code: "INSURANCE_VALUE_MISMATCH",
+      severity: "blocker",
+      message: `Quoted insurance value ${quote.insuranceUsd} does not match document insurance value ${expected.insuranceUsd}.`
+    });
+  }
+  if (!centsEqual(quote.customsValueUsd, expected.customsValueUsd)) {
     findings.push({
       code: "CUSTOMS_VALUE_MISMATCH",
       severity: "blocker",
-      message: `Quoted customs value ${quote.customsValueUsd} does not match expected CIF value ${expectedCustomsValue}.`
+      message: `Quoted customs value ${quote.customsValueUsd} does not match expected CIF value ${expected.customsValueUsd}.`
     });
   }
   const quotedBrokerFeeAtomic = usdcAtomicAmount(quote.customsBrokerFeeUsd);
@@ -151,14 +160,39 @@ export function reviewImportQuote(
   const impliedDutyRatePercent = quote.customsValueUsd > 0
     ? Number((quote.dutyUsd / quote.customsValueUsd * 100).toFixed(4))
     : null;
-  const expectedMockDutyRatePercent = documents.items.every(item => item.hsCode?.startsWith("8471"))
-    ? 0
-    : 5;
-  if (quote.appliedDutyRatePercent !== expectedMockDutyRatePercent) {
+  if (quote.appliedDutyRatePercent !== expected.dutyRatePercent) {
     findings.push({
       code: "MOCK_DUTY_RATE_MISMATCH",
       severity: "blocker",
-      message: `Broker applied ${quote.appliedDutyRatePercent}% duty, but the local mock tariff profile expects ${expectedMockDutyRatePercent}% for the submitted HS codes.`
+      message: `Broker applied ${quote.appliedDutyRatePercent}% duty, but the local mock tariff profile expects ${expected.dutyRatePercent}% for the submitted HS codes.`
+    });
+  }
+  if (!centsEqual(quote.dutyUsd, expected.dutyUsd)) {
+    findings.push({
+      code: "DUTY_AMOUNT_MISMATCH",
+      severity: "blocker",
+      message: `Quoted duty ${quote.dutyUsd} does not match the local mock calculation ${expected.dutyUsd}.`
+    });
+  }
+  if (!centsEqual(quote.taxUsd, expected.vatUsd)) {
+    findings.push({
+      code: "VAT_AMOUNT_MISMATCH",
+      severity: "blocker",
+      message: `Quoted VAT ${quote.taxUsd} does not match the local mock calculation ${expected.vatUsd}.`
+    });
+  }
+  if (!centsEqual(quote.tradePromotionFeeUsd, expected.tradePromotionFeeUsd)) {
+    findings.push({
+      code: "TRADE_PROMOTION_FEE_MISMATCH",
+      severity: "blocker",
+      message: `Quoted trade promotion fee ${quote.tradePromotionFeeUsd} does not match the local mock calculation ${expected.tradePromotionFeeUsd}.`
+    });
+  }
+  if (!centsEqual(quote.filingFeeUsd, expected.filingFeeUsd)) {
+    findings.push({
+      code: "FILING_FEE_MISMATCH",
+      severity: "blocker",
+      message: `Quoted filing fee ${quote.filingFeeUsd} does not match the local mock calculation ${expected.filingFeeUsd}.`
     });
   }
   const vatBase = quote.customsValueUsd + quote.dutyUsd;
@@ -189,7 +223,7 @@ export function reviewImportQuote(
     paymentAllowed: !findings.some(finding => finding.severity === "blocker"),
     reviewedAt: new Date().toISOString(),
     destination: documents.destinationCountry,
-    goodsValueUsd,
+    goodsValueUsd: expected.goodsValueUsd,
     impliedDutyRatePercent,
     impliedVatRatePercent,
     tariffLookupRequired: true,

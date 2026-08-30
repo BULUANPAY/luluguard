@@ -1,0 +1,213 @@
+openapi: 3.1.0
+info:
+  title: LuLuGuard API
+  version: 0.1.0
+servers:
+  - url: /api
+paths:
+  /session:
+    get:
+      operationId: getSession
+      tags: [Session]
+      responses:
+        "200":
+          description: Current signed-in session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+  /shipments:
+    get:
+      operationId: listShipments
+      tags: [Shipments]
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/ShipmentStatus"
+      responses:
+        "200":
+          description: Shipments visible to the active organization
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Shipment"
+  /export-objects:
+    post:
+      operationId: createExportObject
+      tags: [Export Objects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportObjectPayload"
+      responses:
+        "201":
+          description: Export object accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportObjectSubmission"
+components:
+  schemas:
+    Session:
+      type: object
+      required: [user, activeOrganization, organizations, permissions]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        activeOrganization:
+          $ref: "#/components/schemas/Organization"
+        organizations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Organization"
+        permissions:
+          type: array
+          items:
+            type: string
+    User:
+      type: object
+      required: [id, name, email]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+    Organization:
+      type: object
+      required: [id, name, kind]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [importer, exporter, customs-broker]
+    ShipmentStatus:
+      type: string
+      enum: [pending-documents, ready-for-declaration, customs-review, released]
+    Shipment:
+      type: object
+      required:
+        [id, reference, origin, destination, eta, status, updatedAt]
+      properties:
+        id:
+          type: string
+        reference:
+          type: string
+        origin:
+          type: string
+        destination:
+          type: string
+        eta:
+          type: string
+          format: date
+        status:
+          $ref: "#/components/schemas/ShipmentStatus"
+        updatedAt:
+          type: string
+          format: date-time
+    ExportObjectPayload:
+      type: object
+      required:
+        [schemaVersion, objectType, generatedAt, reference, exporter, consignee, commercial, shipment, goods]
+      properties:
+        schemaVersion:
+          type: string
+          enum: ["1.0"]
+        objectType:
+          type: string
+          enum: [export-shipment-draft]
+        generatedAt:
+          type: string
+          format: date-time
+        reference:
+          type: string
+        exporter:
+          type: object
+          required: [companyName, originCountry]
+          properties:
+            companyName:
+              type: string
+            originCountry:
+              type: string
+        consignee:
+          type: object
+          required: [name, country]
+          properties:
+            name:
+              type: string
+            country:
+              type: string
+        commercial:
+          type: object
+          required: [invoiceNo, incoterm, currency, totalValue]
+          properties:
+            invoiceNo:
+              type: string
+            incoterm:
+              type: string
+              enum: [EXW, FOB, CIF, CPT, DAP, DDP]
+            currency:
+              type: string
+              enum: [USD, TWD, JPY, EUR]
+            totalValue:
+              type: number
+        shipment:
+          type: object
+          required: [transportMode, destinationPort, plannedDepartureDate, packageCount, grossWeightKg]
+          properties:
+            transportMode:
+              type: string
+              enum: [sea, air, road]
+            destinationPort:
+              type: string
+            plannedDepartureDate:
+              type: string
+              format: date
+            packageCount:
+              type: integer
+            grossWeightKg:
+              type: number
+        goods:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ExportGoodsItem"
+    ExportGoodsItem:
+      type: object
+      required: [description, hsCode, packageCount, grossWeightKg, dangerousGoods]
+      properties:
+        description:
+          type: string
+        hsCode:
+          type: string
+        packageCount:
+          type: integer
+        grossWeightKg:
+          type: number
+        dangerousGoods:
+          type: boolean
+    ExportObjectSubmission:
+      type: object
+      required: [accepted, reference, submittedAt]
+      properties:
+        accepted:
+          type: boolean
+        reference:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time

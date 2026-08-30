@@ -2,12 +2,16 @@
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
   "globalEnv": [
+    "NODE_ENV",
     "AI_PROVIDER",
     "GEMINI_API_KEY",
     "GEMINI_MODEL",
     "OPENAI_API_KEY",
     "OPENAI_MODEL",
     "MCP_SERVER_URL",
+    "VLEI_VERIFY_MCP_COMMAND",
+    "VLEI_VERIFY_MCP_ARGS",
+    "VLEI_VERIFY_MCP_CWD",
     "SIGNER_PROVIDER",
     "AWS_PROFILE",
     "AWS_REGION",
@@ -33,13 +37,32 @@
     "X402_FACILITATOR_URL",
     "X402_FACILITATOR_TIMEOUT_MS",
     "X402_LIVE_TEST",
-    "LOG_LEVEL"
+    "LOG_LEVEL",
+    "AUDIT_LOG_ENABLED",
+    "AUDIT_LOG_PATH",
+    "AUDIT_LOG_MAX_VALUE_LENGTH",
+    "VLEI_ROOT_SEED",
+    "VLEI_STATE_DIR",
+    "VLEI_EXPECTED_ROOT_AID",
+    "IMPORTER_LEI",
+    "SANDBOX_SESSION_SECRET",
+    "VLEI_SIGNING_ALLOWED_ORIGIN",
+    "VLEI_SIGNING_API_PORT",
+    "VITE_VLEI_SIGNING_API_URL",
+    "VITE_VLEI_SIGNING_LEI"
   ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "!.next/dev/**",
+        "build/**",
+        "dist/**",
+        "src/generated/**"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]
@@ -48,9 +71,10 @@
       "dependsOn": ["^check-types"]
     },
     "test": {
-      "dependsOn": ["^test"]
+      "dependsOn": ["^build", "^test"]
     },
     "dev": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     }

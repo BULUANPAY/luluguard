@@ -4,10 +4,14 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:exporter": "pnpm --filter @luluguard/exporter dev",
+    "dev:vlei-signing-api": "pnpm --filter @repo/vlei-json-signing-api dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "audit:verify": "node scripts/verify-audit-log.mjs",
+    "generate:api": "pnpm --filter @luluguard/api-client generate"
   },
   "devDependencies": {
     "prettier": "3.9.6",

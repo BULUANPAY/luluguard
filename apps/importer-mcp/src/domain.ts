@@ -6,6 +6,7 @@ export interface TradeItem {
   quantity: number;
   unitPriceUsd: number;
   hsCode?: string;
+  dppBatchId?: string;
 }
 
 export type TradeDocumentType =
@@ -14,7 +15,35 @@ export type TradeDocumentType =
   | "bill_of_lading"
   | "certificate_of_origin"
   | "product_specification"
+  | "digital_product_passport"
   | "import_permit";
+
+export interface DigitalProductPassportData {
+  documentId: string;
+  dppId: string;
+  product: {
+    name: string;
+    model: string;
+    hsCode: string;
+    batchId: string;
+    quantity: number;
+    unit: string;
+  };
+  carbonFootprint: {
+    productCarbonFootprintKgCo2e: number;
+    baselineKgCo2e: number;
+    claimedReductionPercent: number;
+    methodology: string;
+    systemBoundary: string;
+    verificationStandard: string;
+    verifiedBy: string;
+    verifiedAt: string;
+  };
+  validity: {
+    validFrom: string;
+    validUntil: string;
+  };
+}
 
 export interface ExportDocuments {
   invoiceNumber: string;
@@ -33,6 +62,7 @@ export interface ExportDocuments {
   billOfLadingNumber?: string;
   certificateOfOriginNumber?: string;
   importPermitNumber?: string;
+  digitalProductPassport?: DigitalProductPassportData;
   providedDocuments: TradeDocumentType[];
   items: TradeItem[];
 }

@@ -1,5 +1,6 @@
 "use client";
 import { FormEvent, useState } from "react";
+import type { JSX } from "react";
 
 type Status = "ACTIVE" | "PAYMENT_PAUSED" | "DISABLED";
 type Policy = {
@@ -13,7 +14,7 @@ type Policy = {
   allowedPayees: string[];
 };
 
-export default function PolicyAdminPage() {
+export default function PolicyAdminPage(): JSX.Element {
   const [policyAdminKey, setPolicyAdminKey] = useState("");
   const [policy, setPolicy] = useState<Policy>();
   const [usage, setUsage] = useState<{ paymentRecords: number; settledUsdc: number }>();
