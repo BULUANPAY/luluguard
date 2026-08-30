@@ -1,6 +1,8 @@
 # LuLuGuard
 
-LuLuGuard is an importer AI agent demo built with Next.js, MCP, and x402 payments. It separates document review, broker quotation, and paid customs submission into explicit stages.
+LuLuGuard is a hackathon reference implementation of an importer AI agent that reviews trade documents, obtains a customs broker quote, and pays the broker through x402.
+
+The payment flow uses Base Sepolia USDC with x402 v2 and the `exact` scheme. The Customs Broker app acts as the Seller / Resource Server and delegates payment verification and settlement to the configured Facilitator.
 
 ## Workspace
 
@@ -8,25 +10,27 @@ This repository is a pnpm and Turborepo monorepo.
 
 ```text
 apps/
-├── importer-mcp/       MCP server, importer workflow, payment policy, and x402 signer
-└── web/                Next.js chat UI, policy admin UI, and server-side AI integration
+├── web/              Next.js UI and policy administration
+├── importer-mcp/     Importer workflow, MCP tools, payment policy, and signer
+└── customs-broker/   x402 Seller / Resource Server
 packages/
-├── eslint-config/      Shared ESLint configuration
-└── typescript-config/  Shared TypeScript configuration
+├── eslint-config/
+└── typescript-config/
 ```
 
-| Application  | Default URL                          | Purpose                         |
-| ------------ | ------------------------------------ | ------------------------------- |
-| Web          | `http://localhost:3000`              | Import workflow UI and AI chat  |
-| Policy admin | `http://localhost:3000/admin/policy` | Runtime payment-policy controls |
-| Importer MCP | `http://127.0.0.1:4020/mcp`          | Streamable HTTP MCP endpoint    |
-| MCP health   | `http://127.0.0.1:4020/health`       | Importer service health check   |
+| Service        | Default URL                          |
+| -------------- | ------------------------------------ |
+| Web            | `http://localhost:3000`              |
+| Policy admin   | `http://localhost:3000/admin/policy` |
+| Importer MCP   | `http://127.0.0.1:4020/mcp`          |
+| Customs Broker | `http://127.0.0.1:4021`              |
 
 ## Requirements
 
 - Node.js 24 or newer; `.nvmrc` currently selects Node.js 26
 - pnpm 11.23.0
 - A Gemini or OpenAI API key
+- A funded Base Sepolia test wallet only when running a real x402 payment
 
 ## Setup
 
@@ -40,115 +44,109 @@ pnpm install
 Create local environment files:
 
 ```sh
-cp apps/importer-mcp/.env.example apps/importer-mcp/.env
 cp apps/web/.env.local.example apps/web/.env.local
+cp apps/importer-mcp/.env.example apps/importer-mcp/.env
+cp apps/customs-broker/.env.example apps/customs-broker/.env
 ```
 
-Both generated files are ignored by Git. Replace every placeholder before testing authenticated MCP access, policy administration, or payment.
+Replace the placeholders documented in each example file. The Importer and Customs Broker must use the same values for:
 
-### Web environment
+- `CUSTOMS_BROKER_ADDRESS`
+- `CUSTOMS_BROKER_FEE_USDC`
+- `X402_NETWORK`
 
-Configure `apps/web/.env.local`:
+`CUSTOMS_BROKER_ADDRESS` must be a non-zero Base Sepolia receiving address. When using `SIGNER_PROVIDER=private-key`, `IMPORTER_ADDRESS` must match `IMPORTER_PRIVATE_KEY`.
 
-| Variable         | Description                                            |
-| ---------------- | ------------------------------------------------------ |
-| `AI_PROVIDER`    | `gemini` or `openai`                                   |
-| `GEMINI_API_KEY` | Required when using Gemini                             |
-| `GEMINI_MODEL`   | Gemini model name                                      |
-| `OPENAI_API_KEY` | Required when using OpenAI                             |
-| `OPENAI_MODEL`   | OpenAI model name                                      |
-| `MCP_SERVER_URL` | Importer MCP URL, normally `http://127.0.0.1:4020/mcp` |
-| `MCP_API_KEY`    | Must exactly match the Importer MCP value              |
+Use only dedicated testnet wallets. Never commit `.env` files or private keys.
 
-Restart the Next.js development server after changing `.env.local`.
+## Run
 
-### Importer MCP environment
-
-Configure `apps/importer-mcp/.env`:
-
-| Variable group  | Variables                                                                                          |
-| --------------- | -------------------------------------------------------------------------------------------------- |
-| Broker          | `CUSTOMS_BROKER_API_URL`, `CUSTOMS_BROKER_ADDRESS`, `CUSTOMS_BROKER_FEE_USDC`                      |
-| Importer signer | `IMPORTER_ADDRESS`, `SIGNER_PROVIDER`, `IMPORTER_PRIVATE_KEY`                                      |
-| AWS KMS signer  | `AWS_PROFILE`, `AWS_REGION`, `AWS_KMS_KEY_ID`, optional `AWS_KMS_ENDPOINT`                         |
-| Payment limits  | `MAX_PAYMENT_USDC`, `MAX_DAILY_PAYMENT_USDC`, `MAX_PAYMENTS_PER_HOUR`, `HUMAN_APPROVAL_ABOVE_USDC` |
-| x402            | `X402_NETWORK`                                                                                     |
-| MCP server      | `MCP_HOST`, `MCP_PORT`, `MCP_API_KEY`                                                              |
-| Policy admin    | `POLICY_ADMIN_API_KEY`                                                                             |
-| Logging         | `LOG_LEVEL`                                                                                        |
-
-Use `SIGNER_PROVIDER=private-key` for a local private key. To use AWS KMS, set `SIGNER_PROVIDER=aws-kms` and configure the AWS variables.
-
-## Run locally
-
-Start the applications:
+Start all applications:
 
 ```sh
 pnpm dev
 ```
 
-Alternatively, run each application in a separate terminal:
+Run applications separately when debugging:
 
 ```sh
+pnpm --filter @luluguard/customs-broker dev
 pnpm --filter @luluguard/importer-mcp dev
-```
-
-```sh
 pnpm --filter @luluguard/web dev
 ```
 
-Confirm that the MCP server is available:
+Check the backend services:
 
 ```sh
+curl http://127.0.0.1:4021/health
 curl http://127.0.0.1:4020/health
 ```
 
-Expected response:
+## x402 flow
 
-```json
-{ "status": "ok", "service": "x402-importer-mcp" }
+The importer workflow exposes three MCP tools:
+
+1. `review_import_documents` reviews mock documents and creates an independent estimate.
+2. `get_import_quote` sends approved documents to the broker and obtains a free quote.
+3. `submit_import_declaration` pays the broker and files the declaration.
+
+The protected Seller flow is:
+
+```text
+POST /customs/quotes
+→ 200 quote
+→ POST /customs/declarations
+→ 402 PAYMENT-REQUIRED
+→ retry with PAYMENT-SIGNATURE
+→ Facilitator verify
+→ prepare declaration
+→ Facilitator settle
+→ 200 + PAYMENT-RESPONSE + receipt
 ```
 
-## Import workflow
-
-The agent exposes three MCP tools in a fixed progression:
-
-1. `review_import_documents`
-   - Reviews the mock documents selected in the Web UI.
-   - Produces an independent importer estimate and a `preflightId`.
-   - Does not contact the customs broker and does not pay.
-2. `get_import_quote`
-   - Requires a successful preflight and explicit estimate confirmation.
-   - Transmits the reviewed documents to the customs broker.
-   - Compares the broker quote with the independent estimate and compliance checks.
-   - Returns a `quoteId` without paying.
-3. `submit_import_declaration`
-   - Requires a matching reviewed quote that has not expired.
-   - Rechecks compliance findings and runtime payment policy.
-   - Requires human approval above the configured threshold.
-   - Uses x402 to pay the broker and submit the declaration.
-
-Payment can be blocked by agent status, payee allowlist, per-payment limit, rolling 24-hour limit, hourly payment count, missing human approval, an expired quote, or a compliance blocker.
+The declaration response is buffered until settlement succeeds. Verification or settlement failure never returns a successful filing receipt.
 
 ## Runtime policy administration
 
-Open `http://localhost:3000/admin/policy`, enter `POLICY_ADMIN_API_KEY`, and load the active policy. The page can:
+Open `http://localhost:3000/admin/policy` and authenticate with `POLICY_ADMIN_API_KEY`. The runtime policy can pause payments, disable the agent, change the broker allowlist, and update per-payment, rolling 24-hour, hourly-count, and human-approval limits.
 
-- set the agent to `ACTIVE`, `PAYMENT_PAUSED`, or `DISABLED`;
-- update payment, daily-spend, hourly-count, and human-approval limits;
-- update the allowed broker addresses;
-- display payment usage recorded during the current MCP process.
+Policy, quote, payment-history, and reconciliation state is process-local and resets when the corresponding service restarts.
 
-The Web proxy forwards requests to:
+## Settlement reconciliation
 
-- `GET /admin/policy`
-- `PUT /admin/policy`
+If a payment was dispatched but its terminal settlement cannot be proven, the Importer records an `ambiguous` or `pending` reconciliation and blocks automatic retry. Query it with the policy admin key:
 
-Policy state, preflights, quotes, and payment history are currently stored in memory and reset when the Importer MCP process restarts.
+```sh
+curl \
+  -H "Authorization: Bearer $POLICY_ADMIN_API_KEY" \
+  http://127.0.0.1:4020/admin/reconciliation/QUOTE_ID
+```
 
-## Validation commands
+Only after an operator independently confirms a terminal failed settlement may the matching owner be released:
 
-Run all workspace checks from the repository root:
+```sh
+curl -X POST \
+  -H "Authorization: Bearer $POLICY_ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  http://127.0.0.1:4020/admin/reconciliation/resolve \
+  -d '{
+    "orderId": "ORDER_ID",
+    "quoteId": "QUOTE_ID",
+    "attemptId": "ATTEMPT_ID",
+    "settlement": {
+      "success": false,
+      "errorReason": "TERMINAL_FAILURE_REASON",
+      "transaction": "0xTRANSACTION_HASH",
+      "network": "eip155:84532"
+    }
+  }'
+```
+
+The API rejects successful settlements, `settlement_pending`, mismatched attempts, and wrong network, payer, or amount values. It does not perform the external on-chain investigation for the operator.
+
+## Validation
+
+Run all workspace checks:
 
 ```sh
 pnpm lint
@@ -157,19 +155,41 @@ pnpm test
 pnpm build
 ```
 
-Run only the Importer tests:
+Run service tests separately:
 
 ```sh
+pnpm --filter @luluguard/customs-broker test
 pnpm --filter @luluguard/importer-mcp test
+```
+
+The Broker suite is offline by default. A funded Base Sepolia wallet is required for the opt-in live smoke test:
+
+```sh
+X402_LIVE_TEST=1 pnpm --filter @luluguard/customs-broker test
 ```
 
 Build and start production processes in separate terminals:
 
 ```sh
 pnpm build
+```
+
+```sh
+pnpm --filter @luluguard/customs-broker start
+```
+
+```sh
 pnpm --filter @luluguard/importer-mcp start
 ```
 
 ```sh
 pnpm --filter @luluguard/web start
 ```
+
+## Scope and limitations
+
+- Customs quotes and declarations are mock data, not a real government or customs integration.
+- Quote, payment, and reconciliation state is stored in memory and is lost on restart.
+- Replay protection and ownership locks are process-local; this demo is not safe for multi-worker or multi-instance deployment without shared durable storage.
+- The implementation supports only Base Sepolia USDC with x402 v2 `exact`.
+- Ambiguous settlement outcomes fail closed and require manual review.
