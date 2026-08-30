@@ -16,6 +16,7 @@ import {
 } from "@luluguard/shared";
 import {
   expectedDocumentIssuerLei,
+  formatVleiVerificationFailures,
   isVleiEnvelopeCandidate,
   parseUploadedFiles,
 } from "../../../lib/vlei-document-verification";
@@ -166,12 +167,25 @@ export async function POST(request: Request) {
           isVleiEnvelopeCandidate(file.content),
         );
         const verificationResults = await Promise.all(files.map(async (file) => {
+          if (!isVleiEnvelopeCandidate(file.content)) {
+            throw new Error(`${file.filename} 不是有效的 vLEI envelope`);
+          }
           const issuer = expectedDocumentIssuerLei(file, order);
           const result = JSON.parse(mcpResultText(await vleiMcp.callTool({
             name: "verify_vlei_json",
             arguments: { envelope: file.content, expectedLei: issuer.expectedLei },
-          }))) as { valid?: boolean; errors?: unknown };
-          return { filename: file.filename, ...issuer, result };
+          }))) as {
+            valid?: boolean;
+            errors?: Array<{ code?: string; message?: string }>;
+          };
+          const actualLei =
+            file.content.protected &&
+            typeof file.content.protected === "object" &&
+            "lei" in file.content.protected &&
+            typeof file.content.protected.lei === "string"
+              ? file.content.protected.lei
+              : undefined;
+          return { filename: file.filename, ...issuer, actualLei, result };
         }));
         return { orderId, files: verificationResults };
       };
@@ -231,7 +245,7 @@ export async function POST(request: Request) {
             const verification = await verifyUploadedVleiDocuments(body.orderId);
             const invalid = verification.files.filter(file => file.result.valid !== true);
             if (invalid.length > 0) {
-              throw new Error(`vLEI 文件驗證失敗：${JSON.stringify(invalid)}`);
+              throw new Error(formatVleiVerificationFailures(invalid));
             }
           }
           if (name === "get_order_files") {

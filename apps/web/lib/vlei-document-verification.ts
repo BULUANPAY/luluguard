@@ -15,6 +15,17 @@ export type OrderParties = {
   importer: { lei: string };
 };
 
+export type DocumentVerificationResult = ReturnType<
+  typeof expectedDocumentIssuerLei
+> & {
+  filename: string;
+  actualLei?: string;
+  result: {
+    valid?: boolean;
+    errors?: Array<{ code?: string; message?: string }>;
+  };
+};
+
 export function isVleiEnvelopeCandidate(
   content: unknown,
 ): content is Record<string, unknown> {
@@ -83,4 +94,28 @@ export function expectedDocumentIssuerLei(
     expectedLei:
       providedBy === "exporter" ? order.exporter.lei : order.importer.lei,
   };
+}
+
+export function formatVleiVerificationFailures(
+  files: DocumentVerificationResult[],
+): string {
+  const descriptions = files.map((file) => {
+    const definition = findTradeDocumentType(file.documentType);
+    const label = definition?.label ?? file.documentType;
+    const provider = file.providedBy === "exporter" ? "出口商" : "進口商";
+    const errors = file.result.errors ?? [];
+    if (errors.some((error) => error.code === "LEI_MISMATCH")) {
+      const actual = file.actualLei
+        ? `，但實際簽署 LEI 為 ${file.actualLei}`
+        : "，但文件使用了其他 LEI 簽署";
+      return `${label}（${file.filename}）由${provider}提供，簽發者 LEI 應為 ${file.expectedLei}${actual}。請由正確的${provider}身分重新簽署後上傳`;
+    }
+    const reasons = errors
+      .map((error) => error.message)
+      .filter((message): message is string => Boolean(message));
+    return `${label}（${file.filename}）的 vLEI 驗證未通過${
+      reasons.length > 0 ? `：${reasons.join("；")}` : ""
+    }。請確認文件完整且由${provider}重新簽署後上傳`;
+  });
+  return `vLEI 文件驗證失敗。${descriptions.join("；")}。`;
 }
