@@ -1,12 +1,8 @@
-import { config as loadEnv } from "dotenv";
 import { basename, dirname, resolve } from "node:path";
 
 const moduleParent = dirname(import.meta.dirname);
 const appRoot =
   basename(moduleParent) === "dist" ? dirname(moduleParent) : moduleParent;
-
-loadEnv({ path: resolve(appRoot, ".env"), override: false, quiet: true });
-
 interface NumberOptions {
   integer?: boolean;
   min?: number;
@@ -20,7 +16,11 @@ export function parseEnvironmentNumber(
   options: NumberOptions = {},
 ): number {
   const value = raw === undefined || raw.trim() === "" ? fallback : Number(raw);
-  const { integer = false, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY } = options;
+  const {
+    integer = false,
+    min = Number.NEGATIVE_INFINITY,
+    max = Number.POSITIVE_INFINITY,
+  } = options;
   if (
     !Number.isFinite(value) ||
     (integer && !Number.isInteger(value)) ||
@@ -31,7 +31,9 @@ export function parseEnvironmentNumber(
       integer && "an integer",
       Number.isFinite(min) && `at least ${min}`,
       Number.isFinite(max) && `at most ${max}`,
-    ].filter(Boolean).join(", ");
+    ]
+      .filter(Boolean)
+      .join(", ");
     throw new Error(
       `${name} must be a finite number${constraints ? ` (${constraints})` : ""}`,
     );
@@ -68,7 +70,7 @@ export const config = {
     lei: process.env.IMPORTER_LEI ?? "8755001ELOZEL05BVX22",
   },
   vlei: {
-    expectedRootAid: process.env.VLEI_EXPECTED_ROOT_AID ?? "",
+    rootSeed: process.env.VLEI_ROOT_SEED ?? "",
   },
   signer: {
     provider: process.env.SIGNER_PROVIDER ?? "private-key",

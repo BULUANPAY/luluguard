@@ -124,15 +124,18 @@ export async function verifyAgentAuthorization(input: {
   if (!input.authorization || typeof input.authorization !== "object") {
     reject("A signed vLEI agent authorization is required");
   }
-  if (!config.vlei.expectedRootAid) {
-    return reject("VLEI_EXPECTED_ROOT_AID is not configured");
+  if (!config.vlei.rootSeed) {
+    return reject("VLEI_ROOT_SEED is not configured");
   }
   let result;
   try {
+    const expectedRootAid = await VleiJsonSigning.deriveRootAid(
+      config.vlei.rootSeed,
+    );
     result = await VleiJsonSigning.verifyJson(
       input.authorization as SignedJsonEnvelope,
       {
-        expectedRootAid: config.vlei.expectedRootAid,
+        expectedRootAid,
         expectedLei: config.importer.lei,
       },
     );
@@ -185,10 +188,7 @@ export async function verifyAgentAuthorization(input: {
     reject("vLEI authorization action mismatch");
   const now = Date.now();
   const expiresAtMs = Date.parse(payload.expiresAt);
-  if (
-    Date.parse(payload.issuedAt) > now + 30_000 ||
-    expiresAtMs <= now
-  ) {
+  if (Date.parse(payload.issuedAt) > now + 30_000 || expiresAtMs <= now) {
     reject("vLEI authorization is not currently valid");
   }
   if (
@@ -199,9 +199,7 @@ export async function verifyAgentAuthorization(input: {
   ) {
     reject("vLEI employee or legal entity binding mismatch");
   }
-  if (
-    !signerInfo.allowedActions.includes(input.action)
-  ) {
+  if (!signerInfo.allowedActions.includes(input.action)) {
     reject(`Employee vLEI role is not authorized for ${input.action}`);
   }
   try {

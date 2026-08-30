@@ -72,7 +72,7 @@ packages/
 | Exporter         | `http://localhost:5173`              | I/V、P/L、DPP 製作與 vLEI 簽章 |
 | vLEI signing API | `http://localhost:3001`              | JSON 簽章 HTTP API             |
 | Importer MCP     | `http://127.0.0.1:4020/mcp`          | Streamable HTTP MCP endpoint   |
-| Customs Broker   | `http://127.0.0.1:4021`              | x402 Seller / Resource Server   |
+| Customs Broker   | `http://127.0.0.1:4021`              | x402 Seller / Resource Server  |
 | MCP health       | `http://127.0.0.1:4020/health`       | Importer MCP health check      |
 
 ## 執行需求
@@ -94,18 +94,14 @@ packages/
 nvm use
 git submodule update --init --recursive
 pnpm install
-cp apps/importer-mcp/.env.example apps/importer-mcp/.env
-cp apps/web/.env.local.example apps/web/.env.local
-cp apps/customs-broker/.env.example apps/customs-broker/.env
+cp .env.example .env
 ```
 
-兩個產生的環境檔都已由 Git 忽略。所有 placeholder 必須在 Demo 前替換；Web 與 Importer MCP 的 `MCP_API_KEY` 必須完全相同。
-
-`apps/customs-broker/.env` 也已由 Git 忽略；Importer 與 customs broker 的 `CUSTOMS_BROKER_ADDRESS`、`CUSTOMS_BROKER_FEE_USDC` 與 `X402_NETWORK` 必須一致。
+所有 app 都透過 Node.js `--env-file-if-exists=../../.env` 讀取 repository root 的 `.env`，此檔已由 Git 忽略。所有 placeholder 必須在 Demo 前替換；共用變數只需設定一次。
 
 ### Web 環境變數
 
-設定 `apps/web/.env.local`：
+在 root `.env` 設定 Web 相關變數：
 
 | 變數                             | 說明                                           |
 | -------------------------------- | ---------------------------------------------- |
@@ -119,11 +115,11 @@ cp apps/customs-broker/.env.example apps/customs-broker/.env
 | `VLEI_VERIFY_MCP_*`              | 可選的 verifier command、args 與 cwd override  |
 | `AUDIT_LOG_*`                    | audit 開關、路徑與單一值長度上限               |
 
-修改 `.env.local` 後要重新啟動 Next.js。
+修改 `.env` 後要重新啟動 Next.js。
 
 ### Importer MCP 環境變數
 
-設定 `apps/importer-mcp/.env`：
+在同一份 root `.env` 設定 Importer MCP 相關變數：
 
 | 變數群組        | 變數                                                                                               |
 | --------------- | -------------------------------------------------------------------------------------------------- |
@@ -132,21 +128,14 @@ cp apps/customs-broker/.env.example apps/customs-broker/.env
 | AWS KMS signer  | `AWS_PROFILE`, `AWS_REGION`, `AWS_KMS_KEY_ID`, optional `AWS_KMS_ENDPOINT`                         |
 | Payment limits  | `MAX_PAYMENT_USDC`, `MAX_DAILY_PAYMENT_USDC`, `MAX_PAYMENTS_PER_HOUR`, `HUMAN_APPROVAL_ABOVE_USDC` |
 | x402            | `X402_NETWORK`；範例 `eip155:84532` 為 Base Sepolia                                                |
-| vLEI            | `IMPORTER_LEI`, `VLEI_EXPECTED_ROOT_AID`                                                           |
+| vLEI            | `IMPORTER_LEI`, `VLEI_ROOT_SEED`                                                                   |
 | MCP server      | `MCP_HOST`, `MCP_PORT`, `MCP_API_KEY`                                                              |
 | Policy admin    | `POLICY_ADMIN_API_KEY`；請勿與 `MCP_API_KEY` 共用                                                  |
 | Audit / logging | `LOG_LEVEL`, `AUDIT_LOG_ENABLED`, `AUDIT_LOG_PATH`, `AUDIT_LOG_MAX_VALUE_LENGTH`                   |
 
 本機 Demo 可用 `SIGNER_PROVIDER=private-key`，但只能放專用測試網私鑰。若要展示託管金鑰邊界，改用 `SIGNER_PROVIDER=aws-kms` 並設定 KMS 變數。
 
-`VLEI_EXPECTED_ROOT_AID` 必須由 Web 所使用的同一個 `VLEI_ROOT_SEED` 推導。先 build package，再於已設定該環境變數的 shell 中執行：
-
-```sh
-pnpm --filter @repo/vlei-json-signing build
-node --input-type=module -e 'import { VleiJsonSigning } from "./packages/vlei-json-signing/dist/index.js"; console.log(await VleiJsonSigning.deriveRootAid(process.env.VLEI_ROOT_SEED));'
-```
-
-將輸出值填入 `apps/importer-mcp/.env` 的 `VLEI_EXPECTED_ROOT_AID`，不要把 seed 填進該欄位。
+Importer MCP 會直接從 `VLEI_ROOT_SEED` 推導並驗證 root AID，不需要另外維護衍生值。
 
 ## 啟動方式
 
